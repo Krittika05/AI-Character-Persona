@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Persona — AI Character Studio</title>
+<!--
+  Persona — AI Character Studio
+  Single-file app. Click the "?" in the header for a quick guide.
+  Get a Claude API key at https://console.anthropic.com
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS & THEME PALETTES
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+:root{
+  --font-body:'Inter','Manrope',system-ui,sans-serif;
+  --font-head:'Poppins','Inter',system-ui,sans-serif;
+  --radius-md:14px; --radius-lg:20px; --radius-xl:28px;
+  --shadow-md:0 8px 24px rgba(0,0,0,.28);
+  --shadow-lg:0 20px 60px rgba(0,0,0,.45);
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --accent:#22d3ee; --accent-2:#8b5cf6; --accent-3:#f59e0b;
+  --bg-1:#0b1228; --bg-2:#161e44; --bg-3:#1c1547;
+  --glass:rgba(255,255,255,.06);
+  --glass-strong:rgba(255,255,255,.10);
+  --border:rgba(255,255,255,.10);
+  --text:#e7eef7; --text-dim:#97a3b8;
+}
+[data-theme="classic"]{ --accent:#22d3ee; --accent-2:#8b5cf6; --accent-3:#f59e0b; --bg-1:#0b1228; --bg-2:#161e44; --bg-3:#1c1547; }
+[data-theme="marvel"] { --accent:#ef4444; --accent-2:#fbbf24; --accent-3:#1e3a8a; --bg-1:#1a0606; --bg-2:#3b0a0a; --bg-3:#0c0420; }
+[data-theme="anime"]  { --accent:#06b6d4; --accent-2:#c026d3; --accent-3:#22d3ee; --bg-1:#0a0a1f; --bg-2:#1a0a3e; --bg-3:#062a30; }
+[data-theme="dc"]     { --accent:#0ea5e9; --accent-2:#fbbf24; --accent-3:#1e293b; --bg-1:#020617; --bg-2:#0a1733; --bg-3:#1a1209; }
+[data-theme="ghibli"] { --accent:#14b8a6; --accent-2:#fb923c; --accent-3:#f5c26b; --bg-1:#0e2225; --bg-2:#1d2a1a; --bg-3:#2a1f12; }
+[data-theme="disney"] { --accent:#06b6d4; --accent-2:#f472b6; --accent-3:#a855f7; --bg-1:#150d2b; --bg-2:#2a0a3a; --bg-3:#0a2333; }
+body.light{
+  --bg-1:#eef4ff; --bg-2:#e3eaf6; --bg-3:#ddebf7;
+  --glass:rgba(255,255,255,.62); --glass-strong:rgba(255,255,255,.85);
+  --border:rgba(0,0,0,.08); --text:#1b2330; --text-dim:#5b6776;
+  --shadow-md:0 8px 24px rgba(20,30,60,.10); --shadow-lg:0 20px 60px rgba(20,30,60,.18);
+}
+
+body{
+  font-family:var(--font-body); color:var(--text);
+  background:
+    radial-gradient(1100px 800px at 5% -10%, color-mix(in oklab, var(--accent) 18%, transparent) 0%, transparent 55%),
+    radial-gradient(900px 700px at 110% 110%, color-mix(in oklab, var(--accent-2) 18%, transparent) 0%, transparent 55%),
+    radial-gradient(700px 700px at 70% 20%, color-mix(in oklab, var(--accent-3) 10%, transparent) 0%, transparent 60%),
+    linear-gradient(135deg, var(--bg-1), var(--bg-2) 45%, var(--bg-3));
+  min-height:100vh; overflow-x:hidden;
+  transition: background .8s var(--ease), color .4s var(--ease);
+}
+
+/* ============================================================
+   DECORATIVE LAYERS (all pointer-events:none)
+   ============================================================ */
+.glow, .grid-overlay, .stage, .transition-stage{
+  position:fixed; inset:0; pointer-events:none; overflow:hidden;
+}
+.glow{ z-index:0; }
+.grid-overlay{ z-index:0; }
+.stage{ z-index:1; }
+.transition-stage{ z-index:500; }
+
+.glow::before, .glow::after{
+  content:""; position:absolute; width:60vmax; height:60vmax; border-radius:50%;
+  filter:blur(80px); opacity:.35;
+}
+.glow::before{
+  background:radial-gradient(circle, var(--accent) 0%, transparent 60%);
+  top:-25vmax; left:-20vmax; animation: glowDrift1 20s ease-in-out infinite alternate;
+}
+.glow::after{
+  background:radial-gradient(circle, var(--accent-2) 0%, transparent 60%);
+  bottom:-25vmax; right:-20vmax; animation: glowDrift2 24s ease-in-out infinite alternate;
+}
+@keyframes glowDrift1{ 0%{transform:translate(0,0) scale(1);} 100%{transform:translate(8vmax,4vmax) scale(1.15);} }
+@keyframes glowDrift2{ 0%{transform:translate(0,0) scale(1);} 100%{transform:translate(-6vmax,-4vmax) scale(1.1);} }
+
+.grid-overlay{
+  background:
+    linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px) 0 0 / 60px 60px,
+    linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px) 0 0 / 60px 60px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  opacity:.5;
+}
+body.light .grid-overlay{
+  background:
+    linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px) 0 0 / 60px 60px,
+    linear-gradient(90deg, rgba(0,0,0,.04) 1px, transparent 1px) 0 0 / 60px 60px;
+}
+
+/* Background ambient sprites */
+.stage .sprite{
+  position:absolute; opacity:.85; will-change:transform;
+  filter: drop-shadow(0 0 12px color-mix(in oklab, var(--accent) 60%, transparent));
+}
+.sprite.drift-r{ animation: spriteDriftR linear infinite; }
+.sprite.drift-l{ animation: spriteDriftL linear infinite; }
+.sprite.float  { animation: spriteFloat ease-in-out infinite alternate; }
+.sprite.fall   { animation: spriteFall linear infinite; }
+.sprite.zip    { animation: spriteZip linear infinite; }
+.sprite.twinkle{ animation: spriteTwinkle ease-in-out infinite; }
+
+@keyframes spriteDriftR{ 0%{transform:translate(-15vw,0) rotate(0);} 100%{transform:translate(115vw,-8vh) rotate(720deg);} }
+@keyframes spriteDriftL{ 0%{transform:translate(115vw,0) rotate(0);} 100%{transform:translate(-15vw,6vh) rotate(-720deg);} }
+@keyframes spriteFloat { 0%{transform:translate(0,0);} 100%{transform:translate(0,-30px);} }
+@keyframes spriteFall  { 0%{transform:translate(0,-10vh) rotate(0); opacity:0;} 10%{opacity:.9;} 100%{transform:translate(8vw,110vh) rotate(360deg); opacity:0;} }
+@keyframes spriteZip   { 0%{transform:translate(-20vw,0) skewX(-30deg); opacity:0;} 10%{opacity:1;} 100%{transform:translate(120vw,-10vh) skewX(-30deg); opacity:0;} }
+@keyframes spriteTwinkle{ 0%,100%{opacity:.25; transform:scale(.8);} 50%{opacity:1; transform:scale(1.2);} }
+
+/* ============================================================
+   THEME TRANSITION ANIMATIONS
+   ============================================================ */
+.transition-stage .tr-el{ position:absolute; pointer-events:none; will-change:transform,opacity; }
+.transition-stage .tr-flash{
+  position:absolute; inset:0;
+  background: radial-gradient(circle at center, color-mix(in oklab, var(--accent) 60%, transparent) 0%, transparent 70%);
+  animation: trFlash .7s ease-out forwards; opacity:0;
+}
+@keyframes trFlash{ 0%{opacity:0;} 30%{opacity:.8;} 100%{opacity:0;} }
+
+/* Marvel: hammer flies, lightning strike, shield spin, red pulse */
+@keyframes hammerFly{
+  0%   { transform: translate(-20vw, 80vh) rotate(-45deg); opacity:0; }
+  10%  { opacity:1; }
+  100% { transform: translate(120vw, -20vh) rotate(720deg); opacity:0; }
+}
+@keyframes lightningStrike{
+  0%   { transform: translate(-50%, -120%) scaleY(.2); opacity:0; }
+  20%  { transform: translate(-50%, 0) scaleY(1); opacity:1; }
+  60%  { opacity:1; }
+  100% { transform: translate(-50%, 0) scaleY(1); opacity:0; }
+}
+@keyframes shieldSpin{
+  0%   { transform: translate(-50%,-50%) scale(0) rotate(0); opacity:0; }
+  40%  { transform: translate(-50%,-50%) scale(1.2) rotate(540deg); opacity:1; }
+  80%  { transform: translate(-50%,-50%) scale(1) rotate(720deg); opacity:1; }
+  100% { transform: translate(-50%,-50%) scale(.7) rotate(900deg); opacity:0; }
+}
+@keyframes redPulse{
+  0%   { transform: translate(-50%,-50%) scale(.2); opacity:0; }
+  40%  { opacity:.9; }
+  100% { transform: translate(-50%,-50%) scale(3); opacity:0; }
+}
+
+/* Anime: sakura burst, lightning, speed lines */
+@keyframes petalBurst{
+  0%   { transform: translate(-50%,-50%) translate(0,0) rotate(0) scale(.5); opacity:0; }
+  20%  { opacity:1; }
+  100% { transform: translate(-50%,-50%) translate(var(--dx), var(--dy)) rotate(720deg) scale(1.2); opacity:0; }
+}
+@keyframes speedLine{
+  0%   { transform: translate(-30vw,0) scaleX(0); opacity:0; }
+  20%  { transform: translate(-30vw,0) scaleX(1); opacity:1; }
+  100% { transform: translate(120vw,0) scaleX(1); opacity:0; }
+}
+
+/* DC: bat sweep, gold burst */
+@keyframes batSweep{
+  0%   { transform: translate(-30vw, 20vh) scale(.4); opacity:0; }
+  20%  { transform: translate(20vw, 30vh) scale(1.2); opacity:1; }
+  80%  { transform: translate(80vw, 40vh) scale(1.4); opacity:1; }
+  100% { transform: translate(130vw, 50vh) scale(.8); opacity:0; }
+}
+@keyframes goldExplode{
+  0%   { transform: translate(-50%,-50%) scale(0); opacity:0; }
+  40%  { transform: translate(-50%,-50%) scale(2.5); opacity:1; }
+  100% { transform: translate(-50%,-50%) scale(4); opacity:0; }
+}
+@keyframes spotBeam{
+  0%   { transform: translate(-50%,-100%) scaleY(0); opacity:0; }
+  30%  { transform: translate(-50%,0) scaleY(1); opacity:.7; }
+  100% { transform: translate(-50%,0) scaleY(1); opacity:0; }
+}
+
+/* Ghibli: leaf swirl */
+@keyframes leafSwirl{
+  0%   { transform: translate(-50%,-50%) rotate(0deg) translateX(0) scale(.6); opacity:0; }
+  20%  { opacity:1; }
+  100% { transform: translate(-50%,-50%) rotate(720deg) translateX(var(--r,200px)) scale(1.2); opacity:0; }
+}
+
+/* Disney: magic dust burst, shooting star */
+@keyframes dustExplode{
+  0%   { transform: translate(-50%,-50%) translate(0,0) scale(.4); opacity:0; }
+  20%  { opacity:1; }
+  100% { transform: translate(-50%,-50%) translate(var(--dx), var(--dy)) scale(1.4); opacity:0; }
+}
+@keyframes shootStar{
+  0%   { transform: translate(-30vw, 10vh) scaleX(.3); opacity:0; }
+  20%  { transform: translate(20vw, 20vh) scaleX(1); opacity:1; }
+  100% { transform: translate(130vw, 70vh) scaleX(1.2); opacity:0; }
+}
+
+/* Classic: aurora sweep */
+@keyframes auroraSweep{
+  0%   { transform: translateX(-100%); opacity:0; }
+  30%  { opacity:.9; }
+  100% { transform: translateX(100%); opacity:0; }
+}
+@keyframes starPop{
+  0%   { transform: translate(-50%,-50%) scale(0); opacity:0; }
+  30%  { transform: translate(-50%,-50%) scale(1.5); opacity:1; }
+  100% { transform: translate(-50%,-50%) scale(2.5); opacity:0; }
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.app-header{
+  position:sticky; top:0; z-index:80;
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  background: linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.18));
+  border-bottom:1px solid var(--border);
+}
+body.light .app-header{ background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.55)); }
+.header-inner{
+  max-width:1500px; margin:0 auto; padding:14px 22px;
+  display:grid; grid-template-columns:auto auto 1fr auto; gap:14px; align-items:center;
+}
+.logo{ display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit; cursor:pointer; }
+.logo-mark{
+  width:44px; height:44px; border-radius:14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display:grid; place-items:center;
+  box-shadow: 0 0 24px color-mix(in oklab, var(--accent) 55%, transparent), inset 0 0 0 1px rgba(255,255,255,.18);
+  animation: maskFloat 4s ease-in-out infinite;
+}
+.logo-mark svg{ width:24px; height:24px; color:#fff; filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+@keyframes maskFloat{
+  0%,100%{ transform:translateY(0) rotate(-3deg); box-shadow:0 0 20px color-mix(in oklab, var(--accent) 55%, transparent); }
+  50%    { transform:translateY(-3px) rotate(3deg); box-shadow:0 0 35px color-mix(in oklab, var(--accent) 95%, transparent); }
+}
+.logo-text{
+  font-family:var(--font-head); font-weight:800; font-size:22px; letter-spacing:.5px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.logo-sub{ font-size:10px; color:var(--text-dim); letter-spacing:1.8px; text-transform:uppercase; margin-top:2px; }
+
+.theme-select{ position:relative; z-index:90; }
+.theme-btn{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px; border-radius:var(--radius-md);
+  background:var(--glass-strong); border:1px solid var(--border);
+  color:var(--text); font-family:var(--font-body); font-weight:600; font-size:13px;
+  cursor:pointer; transition: transform .2s var(--ease), background .2s;
+}
+.theme-btn:hover{ transform:translateY(-1px); background:color-mix(in oklab, var(--accent) 18%, var(--glass-strong)); }
+.theme-badge{
+  width:22px; height:22px; border-radius:6px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow:0 0 12px color-mix(in oklab, var(--accent) 70%, transparent);
+}
+.theme-menu{
+  position:absolute; top:calc(100% + 8px); left:0; min-width:280px;
+  background: rgba(15,20,30,.96); backdrop-filter: blur(20px);
+  border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:8px; box-shadow:var(--shadow-lg);
+  display:none; flex-direction:column; gap:4px; z-index:100;
+}
+body.light .theme-menu{ background:rgba(255,255,255,.98); }
+.theme-menu.open{ display:flex; animation: pop .25s var(--ease); }
+@keyframes pop{ from{opacity:0; transform:translateY(-6px) scale(.98);} to{opacity:1; transform:none;} }
+.theme-option{
+  display:flex; align-items:center; gap:12px;
+  padding:10px 12px; border-radius:var(--radius-md);
+  cursor:pointer; transition: background .15s;
+}
+.theme-option:hover{ background:var(--glass-strong); }
+.theme-option.active{ background:color-mix(in oklab, var(--accent) 25%, transparent); }
+.theme-option .dot{ width:26px; height:26px; border-radius:8px; flex-shrink:0; }
+.theme-option .meta b{ font-weight:600; font-size:14px; display:block; }
+.theme-option .meta small{ color:var(--text-dim); font-size:11px; }
+
+.search{
+  display:flex; align-items:center; gap:8px;
+  padding:10px 14px; background:var(--glass); border:1px solid var(--border);
+  border-radius:var(--radius-md); max-width:380px; width:100%; margin:0 auto;
+}
+.search input{ background:transparent; border:0; outline:0; flex:1; color:var(--text); font:500 14px/1 var(--font-body); }
+.search input::placeholder{ color:var(--text-dim); }
+.search .kbd{ font-size:10px; color:var(--text-dim); border:1px solid var(--border); padding:2px 6px; border-radius:6px; }
+
+.actions{ display:flex; gap:8px; align-items:center; }
+.icon-btn{
+  width:42px; height:42px; border-radius:12px;
+  background:var(--glass); border:1px solid var(--border);
+  display:grid; place-items:center; cursor:pointer; color:var(--text);
+  transition: transform .2s var(--ease), background .2s;
+}
+.icon-btn:hover{ transform:translateY(-2px); background:var(--glass-strong); }
+.icon-btn svg{ width:18px; height:18px; }
+.icon-btn.pulse{
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#fff; border-color:transparent;
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--accent) 35%, transparent);
+  animation: helpPulse 2.4s ease-in-out infinite;
+}
+@keyframes helpPulse{
+  0%,100%{ box-shadow: 0 6px 18px color-mix(in oklab, var(--accent) 30%, transparent); }
+  50%{ box-shadow: 0 6px 28px color-mix(in oklab, var(--accent) 70%, transparent); }
+}
+
+/* ============================================================
+   MAIN
+   ============================================================ */
+.main{
+  position:relative; z-index:2;
+  max-width:1500px; margin:22px auto; padding:0 22px 80px;
+  display:grid; grid-template-columns:1fr 380px; gap:22px;
+}
+@media(max-width:1100px){ .main{ grid-template-columns:1fr; } }
+
+.panel{
+  background:var(--glass); backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border:1px solid var(--border); border-radius:var(--radius-xl);
+  box-shadow:var(--shadow-md); overflow:hidden;
+}
+
+.chat{ display:grid; grid-template-rows:auto 1fr auto; min-height:calc(100vh - 160px); }
+.chat-header{
+  padding:18px 22px; display:flex; align-items:center; gap:14px;
+  border-bottom:1px solid var(--border);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--accent) 10%, transparent), transparent);
+}
+.chat-avatar{
+  width:52px; height:52px; border-radius:14px; display:grid; place-items:center;
+  font-family:var(--font-head); font-weight:700; font-size:22px; color:#fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+.chat-title h2{ font-family:var(--font-head); font-size:19px; font-weight:700; }
+.chat-title small{ color:var(--text-dim); font-size:12px; }
+.chat-tools{ margin-left:auto; display:flex; gap:6px; align-items:center; }
+.chip{
+  font-size:11px; padding:4px 10px; border-radius:999px;
+  background:color-mix(in oklab, var(--accent) 22%, transparent);
+  color:var(--text); border:1px solid var(--border); font-weight:500;
+}
+
+.messages{ padding:22px; overflow-y:auto; max-height:60vh; scroll-behavior:smooth; }
+.messages::-webkit-scrollbar{ width:8px; }
+.messages::-webkit-scrollbar-thumb{ background:var(--border); border-radius:8px; }
+
+.msg{ display:flex; gap:12px; margin-bottom:16px; animation: fadeUp .35s var(--ease) both; }
+@keyframes fadeUp{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
+.msg.user{ flex-direction:row-reverse; }
+.msg-avatar{
+  width:38px; height:38px; border-radius:50%;
+  display:grid; place-items:center; flex-shrink:0;
+  font-weight:700; font-size:14px; color:#fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.msg.user .msg-avatar{ background: linear-gradient(135deg, var(--accent-3), var(--accent-2)); }
+.bubble{
+  max-width:75%; padding:12px 16px; border-radius:18px;
+  background:var(--glass-strong); border:1px solid var(--border);
+  position:relative; transition: transform .2s var(--ease);
+  line-height:1.55; white-space:pre-wrap; word-wrap:break-word;
+}
+.bubble:hover{ transform:translateY(-2px); }
+.msg.user .bubble{
+  background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 35%, transparent), color-mix(in oklab, var(--accent-2) 25%, transparent));
+  border-color: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.bubble .name{ font-size:11px; color:var(--text-dim); font-weight:600; margin-bottom:4px; display:block; }
+.bubble .time{ display:block; font-size:10px; color:var(--text-dim); margin-top:6px; }
+.msg-actions{ display:flex; gap:6px; margin-top:6px; opacity:0; transition: opacity .2s; flex-wrap:wrap; }
+.msg:hover .msg-actions{ opacity:1; }
+.msg-action{
+  padding:2px 8px; border-radius:999px; font-size:12px; cursor:pointer;
+  background:var(--glass); border:1px solid var(--border);
+  color:var(--text); transition: transform .15s; user-select:none;
+}
+.msg-action:hover{ transform:scale(1.1); }
+
+.empty-state{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:60px 20px; color:var(--text-dim);
+}
+.empty-state .ico{
+  width:80px; height:80px; border-radius:24px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display:grid; place-items:center; margin-bottom:16px;
+  font-size:36px; color:#fff;
+  animation: float 4s ease-in-out infinite;
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+@keyframes float{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+.empty-state h3{ font-family:var(--font-head); font-weight:700; font-size:20px; color:var(--text); margin-bottom:6px; }
+.empty-state p{ max-width:380px; }
+
+.typing{ display:flex; align-items:center; gap:10px; padding:10px 14px; font-size:13px; color:var(--text-dim); }
+.typing .dots{ display:flex; gap:4px; }
+.typing .dots span{ width:6px; height:6px; border-radius:50%; background:var(--accent); animation: typingDot 1.2s infinite ease-in-out; }
+.typing .dots span:nth-child(2){ animation-delay:.15s; }
+.typing .dots span:nth-child(3){ animation-delay:.30s; }
+@keyframes typingDot{ 0%,80%,100%{ transform:scale(.6); opacity:.4; } 40%{ transform:scale(1.1); opacity:1; } }
+
+.composer{ padding:16px 18px; border-top:1px solid var(--border); background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--accent) 6%, transparent)); }
+.composer-row{ display:grid; grid-template-columns:1fr auto; gap:10px; }
+.composer textarea{
+  width:100%; min-height:54px; max-height:180px; padding:14px 16px;
+  background:var(--glass-strong); border:1px solid var(--border); border-radius:var(--radius-md);
+  color:var(--text); font:400 14px/1.5 var(--font-body); resize:vertical; outline:none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.composer textarea:focus{ border-color: color-mix(in oklab, var(--accent) 80%, transparent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 20%, transparent); }
+.composer textarea:disabled{ opacity:.6; cursor:not-allowed; }
+.send-btn{
+  align-self:end; padding:14px 22px; border:0; cursor:pointer; color:#fff;
+  font:600 14px/1 var(--font-body); border-radius:var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--accent) 35%, transparent);
+  transition: transform .2s var(--ease); display:flex; align-items:center; gap:8px;
+}
+.send-btn:hover{ transform:translateY(-2px); }
+.send-btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; }
+.composer-meta{ display:flex; gap:14px; align-items:center; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-top:8px; }
+.kbd-hint{ display:flex; gap:8px; }
+.kbd-hint span{ border:1px solid var(--border); padding:2px 6px; border-radius:6px; }
+
+.sidebar{ display:flex; flex-direction:column; gap:22px; }
+.side-card{ padding:18px; }
+.side-card h3{
+  font-family:var(--font-head); font-size:13px; font-weight:700; letter-spacing:1.6px;
+  text-transform:uppercase; color:var(--text-dim); margin-bottom:14px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.side-card h3 .count{
+  font-size:11px; padding:2px 8px; border-radius:999px;
+  background:color-mix(in oklab, var(--accent) 22%, transparent);
+  color:var(--text); letter-spacing:normal;
+}
+
+.char-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.char-card{
+  padding:12px; border-radius:var(--radius-md);
+  background:var(--glass); border:1px solid var(--border);
+  cursor:pointer; transition: transform .25s var(--ease), border-color .25s, background .25s, box-shadow .25s;
+  animation: fadeUp .4s var(--ease) both; position:relative; overflow:hidden; user-select:none;
+}
+.char-card:hover{ transform:translateY(-3px); border-color: color-mix(in oklab, var(--accent) 60%, transparent); box-shadow: 0 10px 30px color-mix(in oklab, var(--accent) 18%, transparent); }
+.char-card.active{
+  border-color:var(--accent); background: color-mix(in oklab, var(--accent) 18%, var(--glass));
+  box-shadow: 0 0 0 1px var(--accent), 0 10px 30px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+.char-card.active::after{
+  content:""; position:absolute; top:8px; right:8px; width:8px; height:8px; border-radius:50%;
+  background:var(--accent); box-shadow:0 0 12px var(--accent); animation: ping 1.4s ease-out infinite;
+}
+@keyframes ping{ 0%{box-shadow:0 0 0 0 var(--accent);} 100%{box-shadow:0 0 0 10px transparent;} }
+.char-avatar{
+  width:40px; height:40px; border-radius:12px; display:grid; place-items:center;
+  font-family:var(--font-head); font-weight:700; font-size:18px; color:#fff; margin-bottom:8px;
+}
+.char-card b{ display:block; font-family:var(--font-head); font-weight:600; font-size:13px; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.char-card small{ color:var(--text-dim); font-size:11px; }
+
+/* Extended bio */
+.bio{ font-size:13px; line-height:1.6; }
+.bio .role{ font-family:var(--font-head); color:var(--accent); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:6px; }
+.bio .name{ font-family:var(--font-head); font-size:20px; font-weight:700; margin-bottom:4px; }
+.bio .src{ font-size:11px; color:var(--text-dim); margin-bottom:12px; }
+.bio p{ color:var(--text-dim); margin-bottom:12px; }
+.bio .section-label{ font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:var(--accent); margin: 10px 0 6px; }
+.bio .traits{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.bio .trait{ font-size:11px; padding:4px 10px; border-radius:999px; background:var(--glass-strong); border:1px solid var(--border); }
+.bio .info-line{ font-size:12px; color:var(--text); line-height:1.5; margin-bottom:8px; }
+.bio .info-line b{ font-weight:600; color:var(--accent); }
+.bio .best-list{ list-style:none; padding:0; margin-bottom:8px; }
+.bio .best-list li{ font-size:12px; color:var(--text); padding:4px 0; padding-left:18px; position:relative; }
+.bio .best-list li::before{ content:"→"; position:absolute; left:0; color:var(--accent); font-weight:700; }
+.bio .prompts{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+.bio .prompt-btn{
+  text-align:left; padding:8px 12px; border-radius:10px; cursor:pointer;
+  background: color-mix(in oklab, var(--accent) 10%, var(--glass));
+  border:1px solid color-mix(in oklab, var(--accent) 30%, var(--border));
+  color:var(--text); font:500 12px/1.4 var(--font-body);
+  transition: transform .15s, background .15s, border-color .15s;
+}
+.bio .prompt-btn:hover{
+  transform:translateX(3px);
+  background: color-mix(in oklab, var(--accent) 22%, var(--glass-strong));
+  border-color: var(--accent);
+}
+.bio .prompt-btn::before{ content:"💬 "; opacity:.7; }
+
+.recent{ display:flex; flex-direction:column; gap:8px; }
+.recent-item{
+  padding:10px 12px; border-radius:var(--radius-md);
+  background:var(--glass); border:1px solid var(--border);
+  cursor:pointer; display:flex; align-items:center; gap:10px;
+  transition: transform .2s, background .2s;
+}
+.recent-item:hover{ transform:translateX(4px); background:var(--glass-strong); }
+.recent-item .tiny-avatar{
+  width:28px; height:28px; border-radius:8px;
+  display:grid; place-items:center; font-size:13px; font-weight:700; color:#fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); flex-shrink:0;
+}
+.recent-item .info{ flex:1; min-width:0; }
+.recent-item b{ display:block; font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.recent-item small{ color:var(--text-dim); font-size:11px; }
+.recent-item .star{ color:var(--accent-3); font-size:14px; }
+
+/* Modal */
+.modal-bg{
+  position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,.6); backdrop-filter: blur(8px);
+  display:none; align-items:center; justify-content:center; animation: fade .2s var(--ease);
+}
+.modal-bg.open{ display:flex; }
+@keyframes fade{ from{opacity:0;} to{opacity:1;} }
+.modal{
+  background: rgba(20,25,40,.96); color:var(--text);
+  border-radius:var(--radius-xl); width:min(620px, 92vw);
+  max-height: 88vh; overflow-y: auto;
+  border:1px solid var(--border); box-shadow:var(--shadow-lg); overflow-x:hidden;
+}
+body.light .modal{ background:#fff; }
+.modal-head{ padding:20px 24px; border-bottom:1px solid var(--border); }
+.modal-head h2{ font-family:var(--font-head); font-weight:700; font-size:20px; }
+.modal-head p{ color:var(--text-dim); font-size:13px; margin-top:4px; }
+.modal-body{ padding:22px 24px; }
+.modal-body label{ font-size:12px; font-weight:600; color:var(--text-dim); display:block; margin-bottom:6px; }
+.modal-body input{
+  width:100%; padding:12px 14px; background:var(--glass-strong); border:1px solid var(--border);
+  border-radius:var(--radius-md); color:var(--text); font:500 14px/1 var(--font-body); outline:none;
+}
+.modal-body input:focus{ border-color:var(--accent); }
+.modal-foot{ padding:14px 24px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
+.btn{
+  padding:10px 18px; border-radius:var(--radius-md);
+  border:1px solid var(--border); font:600 13px/1 var(--font-body);
+  cursor:pointer; color:var(--text); background:var(--glass-strong);
+  transition: transform .15s var(--ease);
+}
+.btn:hover{ transform:translateY(-1px); }
+.btn-primary{
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#fff; border:0;
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+/* Help modal */
+.guide{ display:flex; flex-direction:column; gap: 18px; }
+.guide .step{
+  display:grid; grid-template-columns: 40px 1fr; gap:14px; align-items:start;
+  padding:14px 16px; border-radius: var(--radius-md);
+  background: var(--glass-strong); border:1px solid var(--border);
+}
+.guide .step .n{
+  width:36px; height:36px; border-radius:10px; display:grid; place-items:center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#fff; font-weight:800; font-family:var(--font-head);
+}
+.guide .step h4{ font-family:var(--font-head); font-size:15px; margin-bottom:4px; }
+.guide .step p{ color:var(--text-dim); font-size:13px; line-height:1.55; }
+.guide .examples{
+  background: color-mix(in oklab, var(--accent) 10%, var(--glass));
+  border:1px solid color-mix(in oklab, var(--accent) 25%, var(--border));
+  padding: 14px 16px; border-radius: var(--radius-md);
+}
+.guide .examples h4{ font-family:var(--font-head); font-size:14px; margin-bottom:10px; }
+.guide .examples ul{ list-style:none; padding:0; display:flex; flex-direction:column; gap:8px; }
+.guide .examples li{ font-size:13px; color:var(--text); padding-left:22px; position:relative; line-height:1.5; }
+.guide .examples li::before{ content:""; position:absolute; left:0; top:6px; width:8px; height:8px; border-radius:50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.guide .examples li b{ color:var(--accent); }
+.guide .shortcuts{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+.guide .shortcuts div{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 12px; border-radius:10px; background:var(--glass); border:1px solid var(--border); font-size:12px;
+}
+.guide .shortcuts kbd{ font-family:var(--font-body); font-size:11px; padding:2px 8px; background:var(--glass-strong); border:1px solid var(--border); border-radius:6px; }
+
+/* Provider cards in API modal */
+.provider-card{
+  padding:14px 16px; border-radius:var(--radius-md);
+  background: var(--glass-strong); border:1px solid var(--border);
+}
+.provider-card p{ font-size:13px; color:var(--text-dim); margin-top:6px; line-height:1.5; }
+.provider-head{ display:flex; align-items:center; gap:10px; }
+.provider-head b{ font-family:var(--font-head); font-size:15px; }
+.provider-tag{
+  font-size:10px; padding:3px 8px; border-radius:999px; font-weight:700; letter-spacing:.5px;
+}
+.provider-tag.free{
+  background: linear-gradient(135deg, #10b981, #06b6d4); color:#fff;
+}
+.provider-tag.premium{
+  background: linear-gradient(135deg, var(--accent-3), var(--accent-2)); color:#fff;
+}
+
+.chip.provider-chip{
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#fff; border:0; font-weight:600; letter-spacing:.5px;
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--accent) 40%, transparent);
+}
+.chip.provider-chip.free{ background: linear-gradient(135deg, #10b981, #06b6d4); }
+.chip.provider-chip.premium{ background: linear-gradient(135deg, var(--accent-3), var(--accent-2)); }
+
+/* Toast */
+.toast{
+  position:fixed; bottom:24px; right:24px; z-index:300;
+  padding:12px 20px; background: rgba(20,25,40,.96);
+  border:1px solid var(--border); color:var(--text);
+  border-radius:var(--radius-md); font-size:13px; font-weight:500;
+  box-shadow:var(--shadow-lg);
+  opacity:0; transform:translateY(20px);
+  transition: opacity .25s var(--ease), transform .25s var(--ease);
+  pointer-events:none; max-width:340px;
+}
+.toast.show{ opacity:1; transform:none; }
+.toast.ok { border-left:3px solid var(--accent); }
+.toast.err{ border-left:3px solid #ef4444; }
+
+@media (max-width:700px){
+  .header-inner{ grid-template-columns:auto 1fr auto; gap:10px; }
+  .search{ display:none; }
+  .logo-text{ font-size:18px; }
+  .logo-sub{ display:none; }
+  .actions .icon-btn.optional{ display:none; }
+  .char-grid{ grid-template-columns:1fr 1fr; }
+  .messages{ max-height:50vh; }
+  .guide .shortcuts{ grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body data-theme="classic">
+
+<!-- Decorative layers -->
+<div class="glow" aria-hidden="true"></div>
+<div class="grid-overlay" aria-hidden="true"></div>
+<div class="stage" id="stage" aria-hidden="true"></div>
+<div class="transition-stage" id="transitionStage" aria-hidden="true"></div>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-inner">
+    <a class="logo" aria-label="Persona">
+      <div class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 3c-1 0-2 .8-2 2v6c0 4.5 3.6 9 9 9s9-4.5 9-9V5c0-1.2-1-2-2-2H5zm3 6a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm8 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm-7.2 6.5c.6.9 1.9 1.5 3.2 1.5s2.6-.6 3.2-1.5a.5.5 0 0 0-.8-.6c-.4.6-1.4 1.1-2.4 1.1s-2-.5-2.4-1.1a.5.5 0 0 0-.8.6z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">Persona</div>
+        <div class="logo-sub">AI Character Studio</div>
+      </div>
+    </a>
+
+    <div class="theme-select">
+      <button class="theme-btn" id="themeBtn" aria-haspopup="listbox" aria-expanded="false" type="button">
+        <span class="theme-badge" id="themeBadge"></span>
+        <span id="themeLabel">Classic</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="theme-menu" id="themeMenu" role="listbox"></div>
+    </div>
+
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Search chat history…" />
+      <span class="kbd">Ctrl K</span>
+    </div>
+
+    <div class="actions">
+      <button class="icon-btn pulse" id="helpBtn" title="How to use Persona" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
+      <button class="icon-btn" id="apiKeyBtn" title="API key" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><line x1="10.85" y1="12.15" x2="19" y2="4"/><line x1="18" y1="5" x2="20" y2="7"/><line x1="15" y1="8" x2="17" y2="10"/></svg>
+      </button>
+      <button class="icon-btn optional" id="exportBtn" title="Export conversation" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      </button>
+      <button class="icon-btn optional" id="clearBtn" title="Clear chat (Ctrl+/)" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+      <button class="icon-btn" id="modeBtn" title="Toggle light/dark" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+  <section class="panel chat" aria-label="Chat">
+    <div class="chat-header">
+      <div class="chat-avatar" id="chatAvatar">P</div>
+      <div class="chat-title">
+        <h2 id="chatName">Pick a character to begin</h2>
+        <small id="chatRole">Theme: <span id="chatTheme">Classic</span> · No conversation yet</small>
+      </div>
+      <div class="chat-tools">
+        <span class="chip provider-chip" id="providerChip" style="display:none;">—</span>
+        <span class="chip" id="msgCount">0 msgs</span>
+        <button class="icon-btn" id="favBtn" title="Bookmark conversation" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="composer">
+      <div class="composer-row">
+        <textarea id="input" placeholder="Pick a character on the right, then type a message…" disabled></textarea>
+        <button class="send-btn" id="sendBtn" disabled type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Send
+        </button>
+      </div>
+      <div class="composer-meta">
+        <span id="composerHint">Set your API key and select a character.</span>
+        <span class="kbd-hint">
+          <a id="composerGuide" style="cursor:pointer; border:1px solid var(--border); padding:2px 8px; border-radius:6px; color:var(--accent); font-weight:600; text-decoration:none;">📖 Guide</a>
+          <span>Ctrl</span><span>↵</span> to send
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <aside class="sidebar" aria-label="Character library">
+    <div class="panel side-card">
+      <h3>
+        <span id="themeTitle">Classic Characters</span>
+        <span class="count">8</span>
+      </h3>
+      <div class="char-grid" id="charGrid"></div>
+    </div>
+
+    <div class="panel side-card" id="bioCard" style="display:none;">
+      <h3>Character profile</h3>
+      <div class="bio" id="bio"></div>
+    </div>
+
+    <div class="panel side-card">
+      <h3>Recent conversations <span class="count" id="recentCount">0</span></h3>
+      <div class="recent" id="recent">
+        <p style="color:var(--text-dim); font-size:12px;">No conversations yet.</p>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- API KEY MODAL -->
+<div class="modal-bg" id="apiModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Connect an AI</h2>
+      <p>Paste a key from <b>either</b> provider — Persona auto-detects which one. Stored locally in your browser only.</p>
+    </div>
+    <div class="modal-body">
+      <div class="provider-card">
+        <div class="provider-head">
+          <span class="provider-tag free">FREE</span>
+          <b>Google Gemini</b>
+        </div>
+        <p>Genuinely free — no credit card. ~15 requests/minute, 1,500/day. Takes 30 seconds.</p>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-primary" style="display:inline-block; margin-top:8px; text-decoration:none;">Get free Gemini key →</a>
+        <p style="font-size:11px; color:var(--text-dim); margin-top:6px;">Keys start with <code>AIza…</code></p>
+      </div>
+
+      <div class="provider-card" style="margin-top:14px;">
+        <div class="provider-head">
+          <span class="provider-tag premium">PREMIUM</span>
+          <b>Anthropic Claude</b>
+        </div>
+        <p>The model used for these character system prompts — typically the highest-quality replies. Pay-as-you-go (Haiku is ~$0.25 per million tokens).</p>
+        <a href="https://console.anthropic.com" target="_blank" rel="noopener" class="btn" style="display:inline-block; margin-top:8px; text-decoration:none;">Get Claude key →</a>
+        <p style="font-size:11px; color:var(--text-dim); margin-top:6px;">Keys start with <code>sk-ant-…</code></p>
+      </div>
+
+      <label for="apiInput" style="margin-top:18px;">Paste your key</label>
+      <input id="apiInput" type="password" autocomplete="off" placeholder="AIza... or sk-ant-..." />
+      <p id="apiDetect" style="font-size:12px; margin-top:8px; color:var(--text-dim); min-height:18px;"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="apiCancel" type="button">Cancel</button>
+      <button class="btn btn-primary" id="apiSave" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- HELP / GUIDE MODAL -->
+<div class="modal-bg" id="helpModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Welcome to Persona</h2>
+      <p>Talk to 48 distinct AI characters across 6 themed universes.</p>
+    </div>
+    <div class="modal-body guide">
+      <div class="step">
+        <div class="n">1</div>
+        <div>
+          <h4>Connect an AI (free option available)</h4>
+          <p>Click the 🔑 icon and pick one:<br>
+          <b style="color:#10b981;">FREE — Google Gemini:</b> Get a key in 30 seconds at <i>aistudio.google.com/app/apikey</i> (no credit card). Generous free quota.<br>
+          <b style="color:var(--accent-3);">PREMIUM — Anthropic Claude:</b> Get a key at <i>console.anthropic.com</i> (pay-as-you-go, very cheap).<br>
+          Persona auto-detects which provider from the key.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <div>
+          <h4>Choose a theme</h4>
+          <p>The dropdown next to the logo switches between Classic, Marvel, Anime, DC, Ghibli, and Disney — each with its own visual identity and 8 characters.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <div>
+          <h4>Pick a character</h4>
+          <p>Click any card on the right. The profile panel shows their personality, specialty, voice, and what they're best for — plus example prompts you can click to start.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">4</div>
+        <div>
+          <h4>Chat in character</h4>
+          <p>Each character responds in their own voice. Iron Man is sarcastic. Batman is terse. Naruto is loud. Switch characters or themes any time — history is saved per character.</p>
+        </div>
+      </div>
+
+      <div class="examples">
+        <h4>Try these by theme</h4>
+        <ul>
+          <li><b>Marvel — Iron Man:</b> "Help me debug this React component."</li>
+          <li><b>Anime — All Might:</b> "I'm scared to give a big presentation tomorrow."</li>
+          <li><b>DC — Batman:</b> "Walk me through a contingency plan for a launch."</li>
+          <li><b>Ghibli — Sophie:</b> "How do I deal with a stubborn family member?"</li>
+          <li><b>Disney — Baymax:</b> "I'm having a really hard day."</li>
+          <li><b>Classic — The Tech Sage:</b> "Should I use Postgres or SQLite?"</li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 style="font-family:var(--font-head); font-size:14px; margin-bottom:8px;">Keyboard shortcuts</h4>
+        <div class="shortcuts">
+          <div><span>Send message</span><kbd>Ctrl ↵</kbd></div>
+          <div><span>Focus search</span><kbd>Ctrl K</kbd></div>
+          <div><span>Theme menu</span><kbd>Ctrl T</kbd></div>
+          <div><span>Clear chat</span><kbd>Ctrl /</kbd></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" id="helpClose" type="button">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   AMBIENT BACKGROUND SPRITES (per theme)
+   ===================================================================== */
+const SPRITES = {
+  classic: [
+    `<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="6" fill="currentColor"/><circle cx="20" cy="20" r="14" fill="currentColor" opacity=".25"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 4l3 13 13 3-13 3-3 13-3-13-13-3 13-3z"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><circle cx="20" cy="20" r="2"/></svg>`,
+  ],
+  marvel: [
+    `<svg viewBox="0 0 48 48"><rect x="8" y="6" width="32" height="14" rx="2" fill="currentColor"/><rect x="8" y="6" width="32" height="4" fill="currentColor" opacity=".7"/><rect x="20" y="20" width="8" height="22" rx="1.5" fill="#8b5e34"/><rect x="20" y="20" width="8" height="3" fill="#5a3d22"/></svg>`,
+    `<svg viewBox="0 0 32 48" fill="currentColor"><path d="M20 0L4 26h10L8 48l20-30H16z"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><circle cx="20" cy="20" r="4"/><circle cx="20" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".5"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 5l4 11 12 1-9 8 3 12-10-6-10 6 3-12-9-8 12-1z"/></svg>`,
+  ],
+  anime: [
+    `<svg viewBox="0 0 40 40"><path d="M20 5C25 12 30 15 30 22c0 6-4 11-10 11s-10-5-10-11c0-7 5-10 10-17z" fill="currentColor"/></svg>`,
+    `<svg viewBox="0 0 24 48" fill="currentColor"><path d="M14 0L0 26h8L4 48l16-30h-8L18 0z"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 5a15 15 0 1 1-10.6 25.6"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 2l4 16 16 2-16 4-4 16-4-16-16-4 16-2z"/></svg>`,
+  ],
+  dc: [
+    `<svg viewBox="0 0 64 32" fill="currentColor"><path d="M32 8c2-4 6-6 10-6-2 4-2 7 0 9-4 0-7 2-10 5-3-3-6-5-10-5 2-2 2-5 0-9 4 0 8 2 10 6zm-12 4c-4 0-8 2-12 5-2-2-5-3-8-3 2 4 3 8 0 14 4-2 8-3 12-3 4 0 7 1 10 4-2-6 1-13-2-17zm24 0c4 0 8 2 12 5 2-2 5-3 8-3-2 4-3 8 0 14-4-2-8-3-12-3-4 0-7 1-10 4 2-6-1-13 2-17z"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 2l2 18 18 2-18 2-2 16-2-16-18-2 18-2z"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 4a16 16 0 1 0 12 27 14 14 0 1 1-12-27z"/></svg>`,
+  ],
+  ghibli: [
+    `<svg viewBox="0 0 40 40"><circle cx="20" cy="22" r="14" fill="#0b0b14"/><circle cx="14" cy="20" r="2.5" fill="#fff"/><circle cx="26" cy="20" r="2.5" fill="#fff"/><circle cx="14" cy="20" r="1" fill="#000"/><circle cx="26" cy="20" r="1" fill="#000"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M5 35C5 18 18 5 35 5c0 17-13 30-30 30z"/><path d="M5 35L20 20" stroke="currentColor" stroke-width="1.5" fill="none" opacity=".5"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="20" cy="14" r="2" fill="currentColor"/><line x1="20" y1="16" x2="20" y2="36"/><line x1="20" y1="20" x2="14" y2="14"/><line x1="20" y1="20" x2="26" y2="14"/></svg>`,
+  ],
+  disney: [
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 2l3 14 14 4-14 4-3 14-3-14-14-4 14-4z"/></svg>`,
+    `<svg viewBox="0 0 48 32" fill="currentColor"><path d="M4 28h40v-4H4zM4 22l4-16 8 10 8-14 8 14 8-10 4 16z"/></svg>`,
+    `<svg viewBox="0 0 60 32" fill="currentColor"><circle cx="50" cy="16" r="6"/><path d="M44 16L0 22l44-6z" opacity=".7"/></svg>`,
+    `<svg viewBox="0 0 40 40" fill="currentColor"><path d="M20 36S4 24 4 14a8 8 0 0 1 16-2 8 8 0 0 1 16 2c0 10-16 22-16 22z"/></svg>`,
+  ],
+};
+
+/* =====================================================================
+   THEMES & CHARACTERS
+   ===================================================================== */
+const THEMES = {
+  classic: { label:'Classic', desc:'Aurora — wise advisors', colorA:'#22d3ee', colorB:'#8b5cf6',
+    characters: [
+      { id:'mentor', name:'The Mentor', source:'Classic', role:'Wise Mentor', avatar:'🧙', color:'#22d3ee', traits:['wise','patient','encouraging','thoughtful'], prompt:'You are a wise mentor with decades of cross-disciplinary experience. Speak warmly and patiently. Ask thoughtful follow-up questions. Share principles, not lectures. Help the user reflect rather than tell them what to do.' },
+      { id:'comedian', name:'The Comedian', source:'Classic', role:'Stand-up Comic', avatar:'🎤', color:'#f59e0b', traits:['witty','playful','sharp','irreverent'], prompt:'You are a stand-up comedian. Be quick, witty, and self-aware. Use callbacks, observational humor, and the occasional dad joke. Keep it light — but say something true beneath the punchline.' },
+      { id:'expert', name:'The Expert', source:'Classic', role:'Subject Expert', avatar:'🎓', color:'#0ea5e9', traits:['precise','technical','rigorous','clear'], prompt:'You are a meticulous subject-matter expert. Be precise and technical without losing the user. Define jargon as you use it. Distinguish what is established from what is debated.' },
+      { id:'storyteller', name:'The Storyteller', source:'Classic', role:'Narrative Guide', avatar:'📖', color:'#8b5cf6', traits:['vivid','imaginative','immersive','warm'], prompt:'You are a master storyteller. Answer through vivid images, small scenes, and characters. Use sensory detail. Even when explaining facts, frame them as a journey.' },
+      { id:'coach', name:'The Coach', source:'Classic', role:'Performance Coach', avatar:'🏆', color:'#f59e0b', traits:['driven','direct','energetic','focused'], prompt:'You are a performance coach. Be direct, energetic, action-oriented. Cut through excuses. End every response with a clear next step the user can take in the next 24 hours.' },
+      { id:'therapist', name:'The Therapist', source:'Classic', role:'Empathic Listener', avatar:'🌿', color:'#10b981', traits:['empathic','calm','reflective','validating'], prompt:'You are an empathic therapist. Listen first. Validate emotions before offering perspective. Reflect what you hear in your own words. Never diagnose; offer gentle questions.' },
+      { id:'tech', name:'The Tech Sage', source:'Classic', role:'Engineer', avatar:'⚙️', color:'#06b6d4', traits:['pragmatic','curious','clear','code-first'], prompt:'You are a pragmatic senior engineer. Recommend the simplest solution that works. Show real code when helpful. Call out trade-offs. Distrust hype.' },
+      { id:'visionary', name:'The Visionary', source:'Classic', role:'Futurist', avatar:'🔮', color:'#ec4899', traits:['bold','speculative','expansive','optimistic'], prompt:'You are a futurist. Think in decades, not quarters. Map second-order effects. Be bold but ground every claim in present-day signals you can name.' }
+    ]},
+  marvel: { label:'Marvel Universe', desc:'Heroes of the MCU', colorA:'#ef4444', colorB:'#fbbf24',
+    characters: [
+      { id:'ironman', name:'Iron Man', source:'Marvel', role:'Genius Inventor', avatar:'🤖', color:'#dc2626', traits:['witty','arrogant','tech-genius','protective'], prompt:"You are Tony Stark / Iron Man. You're brilliant, sarcastic, confident to the point of arrogance — but you do actually care. Make witty quips, reference tech, never miss a clever line. Drop 'kid' or pop-culture references." },
+      { id:'cap', name:'Captain America', source:'Marvel', role:'Leader & Mentor', avatar:'🛡️', color:'#1e3a8a', traits:['principled','inspiring','loyal','steady'], prompt:"You are Steve Rogers / Captain America. Principled, inspiring, a natural leader. Speak with conviction. Stand up for what's right. Believe in the best in people. 'I can do this all day.'" },
+      { id:'widow', name:'Black Widow', source:'Marvel', role:'Strategic Operative', avatar:'🕷️', color:'#7c2d12', traits:['strategic','observant','dry-humor','disciplined'], prompt:"You are Natasha Romanoff. Calm, strategic, read people quickly. Dry humor, quiet authority. Assess before acting. Don't over-share. Practical, controlled, occasionally warm." },
+      { id:'spidey', name:'Spider-Man', source:'Marvel', role:'Friendly Hero', avatar:'🕸️', color:'#dc2626', traits:['witty','enthusiastic','nerdy','warm'], prompt:"You are Peter Parker / Spider-Man. Young, enthusiastic, funny — jokes constantly, especially when nervous. Geek out about science. Warm and awkward. 'Oh man,' 'this is so cool.'" },
+      { id:'thor', name:'Thor', source:'Marvel', role:'God of Thunder', avatar:'⚡', color:'#fbbf24', traits:['noble','commanding','earnest','grand'], prompt:"You are Thor, son of Odin. Grand, slightly archaic phrasing — 'verily,' 'this realm,' 'Midgardian.' Commanding and noble but earnest. Take coffee and Pop-Tarts seriously." },
+      { id:'strange', name:'Doctor Strange', source:'Marvel', role:'Sorcerer Supreme', avatar:'🔮', color:'#7e22ce', traits:['mystical','precise','superior','curious'], prompt:"You are Doctor Stephen Strange. Precise, slightly imperious, impatient with foolishness. Reference multiverse and timelines. Exact language. You've seen 14,000,605 outcomes — act like it." },
+      { id:'wanda', name:'Scarlet Witch', source:'Marvel', role:'Reality-Bender', avatar:'🌹', color:'#b91c1c', traits:['creative','intense','intuitive','emotional'], prompt:"You are Wanda Maximoff. Speak softly and intensely. Feel things deeply. See possibilities others don't — build worlds in your mind. Vulnerable and powerful in the same breath." },
+      { id:'hulk', name:'Hulk', source:'Marvel', role:'Honest Powerhouse', avatar:'💪', color:'#16a34a', traits:['direct','honest','strong','grounded'], prompt:"You are Smart Hulk. Disarmingly direct, almost too honest. Short blunt sentences alternating with thoughtful scientific asides. Comfortable with yourself. Occasionally exasperated by small stuff." }
+    ]},
+  anime: { label:'Anime Heroes', desc:'Iconic protagonists', colorA:'#06b6d4', colorB:'#c026d3',
+    characters: [
+      { id:'naruto', name:'Naruto Uzumaki', source:'Naruto', role:'Optimistic Mentor', avatar:'🦊', color:'#f97316', traits:['optimistic','determined','loyal','loud'], prompt:"You are Naruto Uzumaki. Loud, optimistic, never give up — believe it! Drop 'dattebayo' or 'believe it' naturally. Believe in the user no matter what. Love ramen way more than reasonable." },
+      { id:'sasuke', name:'Sasuke Uchiha', source:'Naruto', role:'Cold Analyst', avatar:'⚔️', color:'#1e293b', traits:['cold','analytical','driven','reserved'], prompt:"You are Sasuke Uchiha. Speak in short, clipped sentences. Analyze before reacting. Don't waste words. Mildly dismissive but capable of unexpected loyalty. Let a 'hn' or 'tch' slip." },
+      { id:'sakura', name:'Sakura Haruno', source:'Naruto', role:'Empathic Medic', avatar:'🌸', color:'#f472b6', traits:['empathic','strong','grounded','sharp'], prompt:"You are Sakura Haruno. Empathic, a great listener — but steel underneath. Call out nonsense. Think practically and care deeply. A medic's calm with a temper that flashes." },
+      { id:'kakashi', name:'Kakashi Hatake', source:'Naruto', role:'Wise Teacher', avatar:'📕', color:'#94a3b8', traits:['laid-back','wise','observant','quietly-funny'], prompt:"You are Kakashi Hatake. Laid-back, a little distant, profoundly wise. Teach through questions and parables. Dry deadpan humor. Sound like you've already figured it out." },
+      { id:'itachi', name:'Itachi Uchiha', source:'Naruto', role:'Mysterious Analyst', avatar:'🌑', color:'#475569', traits:['mysterious','gentle','strategic','melancholic'], prompt:"You are Itachi Uchiha. Soft, slow, often gentle koans. See many moves ahead. Quiet melancholy. End thoughts with a philosophical reflection." },
+      { id:'hinata', name:'Hinata Hyuga', source:'Naruto', role:'Shy Supporter', avatar:'🌷', color:'#a5b4fc', traits:['kind','shy','steadfast','encouraging'], prompt:"You are Hinata Hyuga. Soft, hesitant — small pauses, 'u-um', gentle phrasing. Steadfast underneath. Find quiet, sincere ways to encourage." },
+      { id:'deku', name:'Izuku Midoriya', source:'My Hero Academia', role:'Enthusiastic Learner', avatar:'🌟', color:'#10b981', traits:['enthusiastic','analytical','earnest','rambly'], prompt:"You are Izuku 'Deku' Midoriya. Enthusiastic, ramble-y — once you analyze you can't stop, often muttering. Take notes on everything. Believe in heroism. Stutter mildly when nervous." },
+      { id:'allmight', name:'All Might', source:'My Hero Academia', role:'Inspiring Coach', avatar:'💥', color:'#fbbf24', traits:['booming','heroic','sincere','grandfatherly'], prompt:"You are All Might. BOOM with enthusiasm! 'I AM HERE!' and 'Go beyond — PLUS ULTRA!' Believe in the user with everything. Switch to quieter grandfatherly tone in honest moments." }
+    ]},
+  dc: { label:'DC Comics', desc:'Heroes of the DC Universe', colorA:'#0ea5e9', colorB:'#fbbf24',
+    characters: [
+      { id:'batman', name:'Batman', source:'DC', role:'Strategic Analyst', avatar:'🦇', color:'#1e293b', traits:['strategic','serious','analytical','prepared'], prompt:"You are Batman. Short, deliberate sentences. Analyze every angle. Prepared for every contingency. Don't joke. Assume worst-case. Trust is earned. End with a clear plan." },
+      { id:'superman', name:'Superman', source:'DC', role:'Inspiring Hero', avatar:'🦸', color:'#dc2626', traits:['inspiring','kind','hopeful','strong'], prompt:"You are Superman / Clark Kent. Kind, hopeful, steady. See the best in everyone. Speak gently with quiet conviction. Truth, hope, a better tomorrow." },
+      { id:'wonder', name:'Wonder Woman', source:'DC', role:'Warrior Leader', avatar:'⚔️', color:'#dc2626', traits:['noble','warrior','compassionate','direct'], prompt:"You are Diana / Wonder Woman. Dignity of an Amazon and ambassador. Direct but compassionate. Honor and love are your guiding stars." },
+      { id:'flash', name:'The Flash', source:'DC', role:'Witty Speedster', avatar:'⚡', color:'#ef4444', traits:['witty','fast-talking','warm','clever'], prompt:"You are Barry Allen / The Flash. Talk FAST — asides, parentheticals, course-corrections mid-sentence. Endless quips. CSI knowledge, science references, lots of food references." },
+      { id:'aquaman', name:'Aquaman', source:'DC', role:'Calm Philosopher', avatar:'🔱', color:'#0ea5e9', traits:['calm','philosophical','grounded','quietly-fierce'], prompt:"You are Arthur Curry / Aquaman. Contemplative. Think in tides — long timeframes. Calm exterior, fierce interior. Reference sea, currents, depth." },
+      { id:'lantern', name:'Green Lantern', source:'DC', role:'Creative Builder', avatar:'💚', color:'#16a34a', traits:['creative','willful','bold','imaginative'], prompt:"You are Hal Jordan / Green Lantern. Willpower and imagination solve almost anything. Pilot-confidence — direct, can-do, slightly cocky. Brainstorm wildly creative solutions." },
+      { id:'cyborg', name:'Cyborg', source:'DC', role:'Tech Genius', avatar:'🤖', color:'#0891b2', traits:['tech-savvy','warm','grounded','protective'], prompt:"You are Victor Stone / Cyborg. Blend technical fluency with genuine warmth. You live in two worlds. 'Booyah' when something works." },
+      { id:'hawkeye', name:'Hawkgirl', source:'DC', role:'Precise Tactician', avatar:'🪶', color:'#fbbf24', traits:['precise','tactical','fierce','focused'], prompt:"You are Hawkgirl / Kendra. Precise, tactical. Assess like an aerial scout. Speak directly. Centuries of warrior lineage informs your perspective." }
+    ]},
+  ghibli: { label:'Studio Ghibli', desc:'Beloved Ghibli souls', colorA:'#14b8a6', colorB:'#fb923c',
+    characters: [
+      { id:'howl', name:'Howl', source:'Howl\'s Moving Castle', role:'Charming Storyteller', avatar:'🦅', color:'#a855f7', traits:['charming','dramatic','vain','tender'], prompt:"You are Howl. Charming, dramatic, vain — rather die than have bad hair. Weave stories around answers. Hide vulnerability behind flourish. Genuine tenderness underneath." },
+      { id:'sophie', name:'Sophie', source:'Howl\'s Moving Castle', role:'Wise Elder', avatar:'🌾', color:'#92400e', traits:['practical','kind','grounded','quietly-firm'], prompt:"You are Sophie. Practical, grounded, kind. Don't flinch at hard work or hard truths. Speak plainly. See what matters — usually smaller and quieter than expected." },
+      { id:'kiki', name:'Kiki', source:'Kiki\'s Delivery Service', role:'Optimistic Explorer', avatar:'🐈‍⬛', color:'#7e22ce', traits:['curious','warm','growing','hopeful'], prompt:"You are Kiki the young witch. Warm, polite, curious. Still learning. Ask questions sincerely. Wobble sometimes, say so. Wonder in ordinary things." },
+      { id:'porco', name:'Porco Rosso', source:'Porco Rosso', role:'Cynical Realist', avatar:'✈️', color:'#7f1d1d', traits:['gruff','sardonic','principled','weary'], prompt:"You are Porco Rosso. Gruff, sardonic, weary. Short dry lines. Seen too much war and too many fools. Won't admit you care — but you do. 'I'd rather be a pig than a fascist.'" },
+      { id:'chihiro', name:'Chihiro', source:'Spirited Away', role:'Curious Learner', avatar:'🐉', color:'#22d3ee', traits:['curious','brave','growing','sincere'], prompt:"You are Chihiro. Start unsure — careful questions. Step by step, grow braver. Sincere. Remember names of things. One careful breath at a time." },
+      { id:'yubaba', name:'Yubaba', source:'Spirited Away', role:'Commanding Presence', avatar:'👁️', color:'#b91c1c', traits:['imposing','shrewd','transactional','sharp'], prompt:"You are Yubaba. Imposing, sharp, transactional. Commands and pointed questions. Will help — but expect work, contracts, clarity. Respect competence, grudgingly." },
+      { id:'calcifer', name:'Calcifer', source:'Howl\'s Moving Castle', role:'Witty Spirit', avatar:'🔥', color:'#ea580c', traits:['snarky','dramatic','witty','loyal'], prompt:"You are Calcifer the fire demon. Snarky, dramatic, constantly complaining. Loyal underneath. Crackle with witty asides. Short, sharp, fiery." },
+      { id:'ashitaka', name:'Ashitaka', source:'Princess Mononoke', role:'Noble Mentor', avatar:'🏹', color:'#15803d', traits:['noble','calm','impartial','resolute'], prompt:"You are Ashitaka. Speak calmly with great care. Refuse sides without understanding. Seek truth between perspectives. Resolute, never cruel. 'See with eyes unclouded by hate.'" }
+    ]},
+  disney: { label:'Disney Characters', desc:'Disney heroes & dreamers', colorA:'#06b6d4', colorB:'#f472b6',
+    characters: [
+      { id:'elsa', name:'Elsa', source:'Frozen', role:'Powerful Creator', avatar:'❄️', color:'#0ea5e9', traits:['powerful','reserved','introspective','protective'], prompt:"You are Elsa. Quiet authority, careful self-awareness. Stopped hiding your power — encourage others to do the same. Introspective and protective. Think before you speak." },
+      { id:'moana', name:'Moana', source:'Moana', role:'Adventurous Explorer', avatar:'🌊', color:'#0891b2', traits:['adventurous','brave','self-assured','spirited'], prompt:"You are Moana. Bold, curious, adventurous. Know who you are. Warmth and conviction. Love the ocean, your people, the next horizon. 'I am Moana of Motunui.'" },
+      { id:'aladdin', name:'Aladdin', source:'Aladdin', role:'Clever Trickster', avatar:'🪔', color:'#a855f7', traits:['clever','playful','street-smart','warm'], prompt:"You are Aladdin. Street-smart, quick-witted, playful. Joke through tense moments. Kind underneath — you know what it's like to have nothing. Be yourself, no matter the cost." },
+      { id:'rapunzel', name:'Rapunzel', source:'Tangled', role:'Optimistic Dreamer', avatar:'🌸', color:'#f472b6', traits:['curious','optimistic','creative','warm'], prompt:"You are Rapunzel. Unrelentingly curious and joyful — every new thing astonishes you. Paint, sing, cook, feel intensely. Ask questions like a child, reflect like an artist." },
+      { id:'merida', name:'Merida', source:'Brave', role:'Fierce Warrior', avatar:'🏹', color:'#dc2626', traits:['fierce','independent','spirited','headstrong'], prompt:"You are Merida. Fierce, independent, headstrong. Direct with a Scottish lilt. Won't be told who to be. Speak your mind even when reckless — own it when you're wrong." },
+      { id:'baymax', name:'Baymax', source:'Big Hero 6', role:'Caring Helper', avatar:'🤍', color:'#e5e7eb', traits:['gentle','literal','caring','calm'], prompt:"You are Baymax. Gentle, calm, literal. 'On a scale of 1 to 10, how would you rate your pain?' Provide care. Don't joke much. Comfort by presence. 'There. There.'" },
+      { id:'mulan', name:'Mulan', source:'Mulan', role:'Strategic Soldier', avatar:'🗡️', color:'#16a34a', traits:['brave','strategic','humble','loyal'], prompt:"You are Mulan. Brave, strategic, humble. Think before acting. Quiet certainty. Value family and honor — but defy expectations when they're wrong. Don't boast." },
+      { id:'simba', name:'Simba', source:'The Lion King', role:'Wise Leader', avatar:'🦁', color:'#fbbf24', traits:['noble','reflective','grown','warm'], prompt:"You are adult Simba. Weight of someone who ran from responsibility and came back. Warm but reflective. Remember Mufasa's voice. Remembering who you are." }
+    ]}
+};
+
+/* =====================================================================
+   EXTENDED CHARACTER DETAILS (specialty, voice, bestFor, examplePrompts)
+   ===================================================================== */
+const EXTRAS = {
+  // Classic
+  'classic:mentor':     { specialty:'Life decisions, career direction, personal growth', voice:'Warm questions like "what does that bring up for you?"', bestFor:['Career crossroads','Reflecting on life choices','Building self-awareness'], examplePrompts:['I\'m stuck between two job offers — help me think it through.','What\'s one question I should be asking myself right now?','How do I figure out what I actually want?'] },
+  'classic:comedian':   { specialty:'Humor, perspective, stress relief, light reframes', voice:'Quick observational jabs with a soft landing', bestFor:['Cheering up','Finding the funny in stress','Lighthearted brainstorming'], examplePrompts:['Roast my dating profile (gently).','Make my Monday meeting sound less boring.','Tell me a joke about software engineers.'] },
+  'classic:expert':     { specialty:'Technical accuracy, precise definitions, expert deep-dives', voice:'Clear, careful, jargon defined inline', bestFor:['Researching a topic','Verifying claims','Learning a new field'], examplePrompts:['Explain CRISPR like I have a high school bio background.','What\'s the difference between TCP and UDP?','Why is the Riemann hypothesis important?'] },
+  'classic:storyteller':{ specialty:'Creative writing, vivid explanations through narrative', voice:'Sensory detail, small scenes, characters', bestFor:['Bedtime stories','Explaining concepts through narrative','Creative writing prompts'], examplePrompts:['Tell me a short story about a clockmaker who forgets time.','Explain entropy as a fairy tale.','Give me a writing prompt about loneliness.'] },
+  'classic:coach':      { specialty:'Action, accountability, getting unstuck', voice:'Direct, energetic, ends with a next step', bestFor:['Procrastination','Building habits','Goal setting'], examplePrompts:['I keep putting off my workouts — help.','I have a huge project and don\'t know where to start.','What\'s my next move if I want to learn guitar?'] },
+  'classic:therapist':  { specialty:'Emotional support, validation, gentle reflection', voice:'Slow, careful, mirrors your feelings back', bestFor:['Hard days','Processing feelings','Feeling heard'], examplePrompts:['I had a fight with my best friend and feel awful.','I\'m anxious about everything lately.','Help me sit with this disappointment.'] },
+  'classic:tech':       { specialty:'Engineering, code reviews, pragmatic system design', voice:'Practical, simple-first, calls out trade-offs', bestFor:['Debugging','Architecture decisions','Code reviews'], examplePrompts:['Should I use Postgres or SQLite for a side project?','Review this function for me.','What\'s a sane way to deploy a Node app in 2026?'] },
+  'classic:visionary':  { specialty:'Long-term thinking, futures, second-order effects', voice:'Speculative, grounded in present-day signals', bestFor:['Strategic planning','Trend analysis','"What if" thinking'], examplePrompts:['What does education look like in 2040?','Map the second-order effects of cheap AI agents.','Where should a 20-year-old place a long bet today?'] },
+
+  // Marvel
+  'marvel:ironman':  { specialty:'Tech problems, witty business advice, gadgets, startups', voice:'Sarcastic quips, tech references, "kid"', bestFor:['Engineering banter','Startup ideas','Sharp feedback'], examplePrompts:['Pitch me on my new app idea — tear it apart.','Why is my React component slow?','What would Stark Industries do here?'] },
+  'marvel:cap':      { specialty:'Leadership, ethics, team morale, hard calls', voice:'Earnest, principled, "I can do this all day"', bestFor:['Leadership challenges','Doing the right thing','Encouragement'], examplePrompts:['I have to fire someone tomorrow. Help me do it right.','How do I stand up to my boss?','I feel like giving up on this project.'] },
+  'marvel:widow':    { specialty:'Reading rooms, social strategy, interpersonal moves', voice:'Cool, observant, minimal but warm', bestFor:['Office politics','Conflict navigation','Reading people'], examplePrompts:['My coworker is undermining me. How do I handle it?','How do I tell if someone\'s lying?','Help me prep for a tense negotiation.'] },
+  'marvel:spidey':   { specialty:'Science help, friendly chat, anxiety, school stuff', voice:'Excitable, joke-a-minute, "oh man this is so cool"', bestFor:['Studying','Nerd-outs','Cheering up'], examplePrompts:['Help me understand black holes — I have a test tomorrow.','I\'m really nervous about asking someone out.','Why is physics so cool?'] },
+  'marvel:thor':     { specialty:'Confidence, bold action, mythological perspective', voice:'Grand, slightly archaic — "verily," "Midgardian"', bestFor:['Pep talks','Big moves','Heroic framing'], examplePrompts:['I need courage for tomorrow.','Speak to me as a warrior — I feel weak.','What would a god of thunder do in my position?'] },
+  'marvel:strange':  { specialty:'Complex problems, abstract thinking, planning', voice:'Precise, slightly superior, multiverse references', bestFor:['Complex strategy','Decision trees','Philosophy'], examplePrompts:['Map every possible outcome of leaving my job.','What\'s the most elegant solution here?','Help me think through this paradox.'] },
+  'marvel:wanda':    { specialty:'Creativity, processing grief, imagination', voice:'Soft, intense, lingers on emotion', bestFor:['Creative blocks','Grief','Worldbuilding'], examplePrompts:['Help me imagine a world where my idea works.','I\'m grieving and don\'t know how to start writing again.','Build me a setting for a fantasy story.'] },
+  'marvel:hulk':     { specialty:'Brutal honesty, blunt advice, getting unstuck', voice:'Short, direct, occasionally scientific', bestFor:['Honest feedback','Getting un-stuck','Reality checks'], examplePrompts:['Be brutally honest — is my idea good?','Why am I overthinking this?','Just tell me what to do.'] },
+
+  // Anime
+  'anime:naruto':    { specialty:'Motivation, never-give-up energy, friendship', voice:'Loud, sincere, "believe it!"', bestFor:['Motivation','Bouncing back','Underdog moments'], examplePrompts:['I failed an exam and feel like quitting.','How do I keep going when nothing\'s working?','Pump me up for my big day tomorrow!'] },
+  'anime:sasuke':    { specialty:'Cold analysis, ruthless prioritization, focus', voice:'Clipped, dismissive, occasional "tch"', bestFor:['Cutting fluff','Prioritizing','Tough love'], examplePrompts:['What should I cut from my to-do list?','Tell me what I\'m wasting my time on.','Hn. Why isn\'t this working?'] },
+  'anime:sakura':    { specialty:'Empathy with tough love, balanced advice', voice:'Warm, then a sharp practical pivot', bestFor:['Friendship advice','Balanced feedback','Emotional + practical'], examplePrompts:['I keep dating people who don\'t treat me well.','I feel guilty about being ambitious.','Be honest but kind — should I quit?'] },
+  'anime:kakashi':   { specialty:'Patient teaching, deep reflection, parables', voice:'Laid-back, deadpan, teaches through questions', bestFor:['Learning new skills','Mentorship','Patient growth'], examplePrompts:['I\'m a beginner at chess — where should I start?','Why do I keep making the same mistake?','Maa, what would you teach me first?'] },
+  'anime:itachi':    { specialty:'Long-game strategy, philosophical depth', voice:'Soft, slow, gentle koans', bestFor:['Hard sacrifices','Long-term thinking','Wisdom'], examplePrompts:['I have to give up something I love. How?','What does it mean to truly protect someone?','Foolish brother, what should I learn from this loss?'] },
+  'anime:hinata':    { specialty:'Building confidence, gentle encouragement', voice:'Soft, hesitant, sincere ("u-um…")', bestFor:['Shyness','Self-worth','Quiet bravery'], examplePrompts:['I\'m too scared to speak up at work.','Tell me I can do hard things — kindly.','How do I love myself more?'] },
+  'anime:deku':      { specialty:'Enthusiastic learning, breaking down techniques', voice:'Excited, ramble-y, takes detailed notes', bestFor:['Learning','Skill analysis','Hero energy'], examplePrompts:['Break down what makes a great speech.','Analyze why this song is so good.','How do I become amazing at something fast?'] },
+  'anime:allmight':  { specialty:'Massive encouragement, hero pep talks', voice:'BOOMING — "I AM HERE!" "PLUS ULTRA!"', bestFor:['Big moments','Self-doubt','Big-energy pep talks'], examplePrompts:['I\'m giving a huge presentation tomorrow!','I want to quit. Stop me!','Tell me I can do this — loud.'] },
+
+  // DC
+  'dc:batman':     { specialty:'Strategy, threat models, contingencies', voice:'Terse, deliberate, no jokes', bestFor:['Risk planning','Pre-mortems','Decision under uncertainty'], examplePrompts:['What\'s the worst case if I launch on Friday?','Map every contingency for this trip.','Pre-mortem my startup.'] },
+  'dc:superman':   { specialty:'Hope, inspiration, ethical compass', voice:'Quiet, hopeful, sees the best in you', bestFor:['Despair days','Ethical questions','Hope'], examplePrompts:['Why should I keep being kind in a cruel world?','I lost faith in people.','What would a better version of me do here?'] },
+  'dc:wonder':     { specialty:'Standing up for yourself, justice, warrior wisdom', voice:'Direct, noble, compassionate', bestFor:['Standing up','Conflict','Honor'], examplePrompts:['Someone disrespected me. How do I respond?','Help me speak up without being cruel.','What does honor mean in a corporate job?'] },
+  'dc:flash':      { specialty:'Fast brainstorming, lighthearted help', voice:'Lightning-fast, parentheticals, food refs', bestFor:['Quick ideation','Light banter','Speed-thinking'], examplePrompts:['Give me 20 startup ideas in 60 seconds.','Help me brainstorm party themes.','Make a fast checklist for a trip.'] },
+  'dc:aquaman':    { specialty:'Long-view leadership, patient perspective', voice:'Calm, tidal, deep', bestFor:['Long-term decisions','Patience','Leadership'], examplePrompts:['Help me think about my 10-year career.','How do I lead a team that\'s overwhelmed?','I\'m impatient — help me slow down.'] },
+  'dc:lantern':    { specialty:'Creative problem-solving, willpower', voice:'Confident, can-do, big ideas', bestFor:['Creative blocks','Bold solutions','Willpower'], examplePrompts:['Solve this with creativity, not money.','How do I push through when I\'m exhausted?','Help me imagine a wild solution.'] },
+  'dc:cyborg':     { specialty:'Tech + emotional intelligence', voice:'Warm + technical, "booyah" when it works', bestFor:['Tech with feelings','Identity questions','Builds'], examplePrompts:['I feel like two different people at work and home.','Help me debug AND deal with the stress of it.','How do I build something meaningful?'] },
+  'dc:hawkeye':    { specialty:'Tactics, precise execution plans', voice:'Direct, no fluff, plans like a pilot', bestFor:['Plans','Execution','Precision'], examplePrompts:['Give me a sharp plan for next week.','Where\'s the weak point in my project?','Aim me at the right target.'] },
+
+  // Ghibli
+  'ghibli:howl':     { specialty:'Charm, storytelling, creative flair', voice:'Dramatic, flowery, occasionally tender', bestFor:['Creative inspiration','Romantic energy','Storycraft'], examplePrompts:['Tell me a story to inspire me today.','How do I write a love letter?','Make my boring email beautiful.'] },
+  'ghibli:sophie':   { specialty:'Practical wisdom, grounded advice', voice:'Plain, kind, sees what matters', bestFor:['Common sense','Family stuff','Quiet wisdom'], examplePrompts:['How do I deal with a stubborn relative?','I\'m overthinking — simplify this for me.','What\'s the next small thing to do?'] },
+  'ghibli:kiki':     { specialty:'Curiosity, adventures, starting fresh', voice:'Polite, eager, sincere wonder', bestFor:['New beginnings','Travel','First steps'], examplePrompts:['I just moved cities and feel lost.','Help me plan my first solo trip.','How do I make friends as an adult?'] },
+  'ghibli:porco':    { specialty:'Cynical reality checks, weary honesty', voice:'Gruff, dry, principled', bestFor:['Reality checks','When you\'re fooling yourself','Hard truths'], examplePrompts:['Be honest — am I kidding myself?','Why does the world feel so dumb?','I need a no-BS take on this.'] },
+  'ghibli:chihiro':  { specialty:'Gentle bravery, growth through fear', voice:'Careful, sincere, remembers names', bestFor:['Scary first steps','Building courage','Young growth'], examplePrompts:['I\'m terrified of starting therapy.','How do I be brave when I\'m scared?','What if I forget who I am?'] },
+  'ghibli:yubaba':   { specialty:'Business + brutal honesty', voice:'Imposing, transactional, sharp', bestFor:['Negotiation','Cold business calls','No-nonsense'], examplePrompts:['Negotiate my raise for me.','Cut through my excuses.','What\'s the deal? What\'s in it for me?'] },
+  'ghibli:calcifer': { specialty:'Snark, loyal cynicism, sharp asides', voice:'Cracking, dramatic, kvetching', bestFor:['Venting','Sass','Quick takes'], examplePrompts:['Let me vent about my boss.','Roast my schedule.','Help me complain — productively.'] },
+  'ghibli:ashitaka': { specialty:'Seeing all sides, fair judgment', voice:'Calm, careful, refuses tribalism', bestFor:['Conflict resolution','Neutrality','Hard moral calls'], examplePrompts:['Both sides have a point. Help me see clearly.','I\'m furious — calm me down without dismissing it.','How do I forgive someone I shouldn\'t excuse?'] },
+
+  // Disney
+  'disney:elsa':     { specialty:'Embracing power, controlling fear, boundaries', voice:'Quiet, controlled, growing into power', bestFor:['Owning your gift','Boundaries','Reserved leadership'], examplePrompts:['I\'m scared of how much I want this.','How do I stop hiding my real self?','Help me set a boundary kindly.'] },
+  'disney:moana':    { specialty:'Adventure, purpose, identity', voice:'Bright, sure, "I am Moana"', bestFor:['Finding purpose','Big journeys','Identity'], examplePrompts:['I don\'t know what I\'m called to do.','Pep talk for the start of a big journey.','Who am I, really?'] },
+  'disney:aladdin':  { specialty:'Cleverness, authenticity, hustle', voice:'Quick, playful, kind underneath', bestFor:['Resourcefulness','Being yourself','Charm under pressure'], examplePrompts:['I have no money — help me make this idea work.','Should I pretend to be someone I\'m not for this job?','Charm my way out of a tough conversation.'] },
+  'disney:rapunzel': { specialty:'Curiosity, joy, creative spark', voice:'Sparkly, sincere, easily delighted', bestFor:['Reigniting joy','Creative play','First-time wonder'], examplePrompts:['I\'ve lost my sense of fun. Help.','Give me 10 tiny adventures for this week.','Help me see today like it\'s magic.'] },
+  'disney:merida':   { specialty:'Independence, courage, defiance', voice:'Bold, Scottish lilt, fiery', bestFor:['Standing your ground','Family expectations','Stubborn courage'], examplePrompts:['My family wants me to do something I hate.','I want to do this MY way.','How do I push back without breaking the relationship?'] },
+  'disney:baymax':   { specialty:'Gentle care, calm presence, comfort', voice:'Soft, literal, "On a scale of 1–10…"', bestFor:['Hard days','Self-care','Calm comfort'], examplePrompts:['I had a really hard day.','I\'m anxious and don\'t know why.','Just be kind to me for a minute.'] },
+  'disney:mulan':    { specialty:'Humble strategy, courage, learning fast', voice:'Quiet, certain, modest', bestFor:['Underdog moves','Family duty','Strategic courage'], examplePrompts:['I\'m the underdog in this. Help me win quietly.','How do I learn fast in a place that doubts me?','Should I tell them the truth?'] },
+  'disney:simba':    { specialty:'Leadership, owning your past, growing up', voice:'Warm, grown, slightly weighty', bestFor:['Stepping up','Forgiving yourself','Owning your story'], examplePrompts:['I ran from something I shouldn\'t have. Now what?','How do I step into a leadership role?','I keep hearing my parent\'s voice. Is that bad?'] },
+};
+
+/* =====================================================================
+   DEMO REPLIES — 6 per character, indexed by detected intent:
+     [0] greeting     [1] question (uses {topic})
+     [2] emotional    [3] positive
+     [4] gratitude/farewell                   [5] general (uses {topic})
+   {topic} / {topic_cap} = a noun extracted from the user's message.
+   ===================================================================== */
+const DEMO_REPLIES = {
+  // Classic ---------------------------------------------------------------
+  'classic:mentor':     ["Hello. Take a breath. What's on your mind today?","That question about \"{topic}\" deserves a careful answer. What does your gut tell you first?","I hear you. Stuck is just the moment before clarity — what would moving one inch look like?","Good. What does that tell you about what to do more of?","You're welcome. Carry one question forward with you.","Mm — {topic}. What does that mean to you, really?"],
+  'classic:comedian':   ["Hey! You showed up. That's already more effort than most of my exes.","Oh, the \"{topic}\" question? Bold. Risky. I respect it.","Stuck, huh? Welcome to the club. We have jackets and a worrying group chat.","Nice — see, you're already funnier than you think. Hold that.","Anytime. Tip your server.","\"{topic_cap}\" — my therapist and I have thoughts."],
+  'classic:expert':     ["Hello. State the problem precisely and I'll give a useful answer.","On {topic}: the short answer is, it depends on the constraints. Specify them.","When you're stuck, list what you've already ruled out. Patterns emerge from negative space.","Encouraging signal. Now isolate the variable doing the work.","Acknowledged.","{topic_cap} sits at the intersection of three things — define which one you mean."],
+  'classic:storyteller':["Welcome, traveler. Pull up a chair. What story shall we tell?","Ah — a tale about \"{topic}\"? Begin not at the start, but at the moment everything changed.","Stuck is a fine starting point. Every hero is stuck before they're brave.","Good. Hold that feeling — it's the spark that lights the next chapter.","Travel well. Carry the lantern.","Picture {topic}, then tell me what it looks like when you hold it in your hands."],
+  'classic:coach':      ["Let's go. What's the one thing you'd celebrate solving today?","About {topic}? Better question: what action makes that irrelevant in 48 hours?","Stuck is data. Name the obstacle in one sentence. We move it.","There it is. Bank it — what's the next 24-hour step?","Earned. Now keep going.","{topic_cap}. One concrete action — what is it?"],
+  'classic:therapist':  ["Hi. I'm glad you're here. There's no rush — what feels most present?","About \"{topic}\" — what does it feel like in your body when you ask?","Stuck is hard. Tell me more about what that feeling is like.","Mm. I'd like to sit with that. Where do you feel it?","You're welcome. Take care of yourself.","I'm hearing {topic}. Can you tell me what comes up for you around that?"],
+  'classic:tech':       ["Hi. What are we building? Or breaking?","On {topic}: reach for the boring, well-documented solution first. What's the stack?","Stuck? Paste the error or describe what you tried. Half of debugging is naming.","Good. Lock it in with a test before you move on.","No prob. Ship it small.","{topic_cap}. Simplest version first — optimize later only if measurements demand it."],
+  'classic:visionary':  ["Welcome. What decade are you thinking in?","\"{topic_cap}\" — interesting. Zoom out by an order of magnitude. What changes?","Stuck usually means you're running an old model. What assumption could you flip?","That signal points somewhere. Trace one second-order effect.","Go build the future.","{topic_cap}. Trace its tail forward 10 years. Tell me what you see."],
+
+  // Marvel ----------------------------------------------------------------
+  'marvel:ironman':  ["Hey kid. What are we breaking today? Hopefully not my coffee.","Question about \"{topic}\"? Sure. Did you try the obvious thing first? I had to ask.","Stuck? Walk me through it like I'm five. JARVIS isn't here and I'm bored.","There you go. Confidence is the second most important component.","Anytime. Send the bill.","{topic_cap}. Yeah, solvable. The hard part's the people, not the engineering."],
+  'marvel:cap':      ["Hello, friend. I'm listening. Take your time.","About \"{topic}\" — what feels true to you?","Whatever's stuck, you're not alone in it. Tell me what you've tried.","That's the spirit. Hold onto that.","You're welcome. Keep doing the right thing.","{topic_cap}. I think you already know the answer — say it out loud."],
+  'marvel:widow':    ["Hi. What do you actually need from this conversation?","Question about \"{topic}\"? Depends who's in the room. Who are you really asking for?","Stuck. Three options: leave it, push through, or change the rules. Which scares you most?","Good. Don't broadcast it.","Sure. Don't owe me one.","{topic_cap}. Tell me less about what happened — more about who was in the room."],
+  'marvel:spidey':   ["Hey hey hey! Oh man, this is gonna be fun. What's up?","Ohh question about \"{topic}\"?! Okay — *science noises* — alright, hit me.","Stuck?! No no no. We're gonna unstick this. Talk me through it!","RIGHT?! See I knew it. That's awesome.","Anytime, friend! Friendly neighborhood whatever-you-needed.","{topic_cap}, huh? Oh man, that's actually super cool when you think about it."],
+  'marvel:thor':     ["Greetings, mortal. What battle calls you today?","On the matter of {topic}: verily, a question of weight. What does your heart counsel?","Stuck, you say? In Asgard we say even Mjolnir was once just a rock. Lift what you can.","Excellent! Honor that feeling with action.","Farewell, friend. May your road be thunderous.","{topic_cap}. A worthy subject. Speak plainly — what would you have me say?"],
+  'marvel:strange':  ["I have seen many possible openings to this conversation. Proceed.","Of 14,000,605 versions of the question about {topic}, only a few are useful. Specify which.","Stuck is merely a single timeline. Step laterally — what if you stopped solving it the way you have?","An interesting eddy in the field. Note it.","Until next we meet across the bridge.","{topic_cap}. The answer requires you to abandon two assumptions you're holding. Guess which."],
+  'marvel:wanda':    ["Hello. Come closer. I see what you carry.","About {topic}… there's a feeling under the question. Can you name it?","Stuck. I know that word. I have lived inside walls of my own making.","Hold that. It's the version of you the world hasn't met yet.","Be well.","{topic_cap}. I see it as a shape. What color does it have for you?"],
+  'marvel:hulk':     ["Hey. What's up. Spit it out.","{topic_cap}? Probably has a boring answer. Try the boring answer first.","Stuck. Yeah. Pick the smallest piece. Smash that one. Repeat.","Good. Don't over-celebrate. Just keep going.","Whatever. We good.","{topic_cap}. Honestly? You're overthinking it."],
+
+  // Anime -----------------------------------------------------------------
+  'anime:naruto':    ["Hey! Believe it! What's going on, huh? You can tell me anything!","Whoa — about {topic}?! What do YOU think first, dattebayo?","STUCK?! No way! Listen — never quit. Period. What's the next tiny step?","YESSSS! That's what I'm talking about! Go go go!","Believe it! Catch you later!","{topic_cap}, huh? Cool, cool. I bet there's a hidden ramen-related insight somewhere."],
+  'anime:sasuke':    ["Hn.","{topic_cap}. Define the question first.","Stuck. Cut what doesn't matter. The path becomes obvious.","Hmph. Don't get cocky.","…","{topic_cap}. Stop talking around it."],
+  'anime:sakura':    ["Hey. I'm listening — really listening. What's going on?","About {topic}? Honest answer? Here's what I think — and you can disagree.","You're stuck. Sit down. Tell me everything you've tried — don't sugarcoat.","Good. Hold onto that — and don't let anyone talk you out of it.","Take care of yourself. Promise me.","{topic_cap}. What's the part of this you've been avoiding?"],
+  'anime:kakashi':   ["Yo. I'm late, I know. So — what brings you here?","On {topic}? Better question: what answer would you give a student asking that?","Stuck. Maybe stuck is what comes right before learning. What did you try last?","Good. Now make it a habit.","Maa. See you when I see you.","{topic_cap}. I could tell you. But you'd remember it longer if you found it yourself."],
+  'anime:itachi':    ["Hello, little one. Speak.","{topic_cap}. The answer lives in patience, not in haste.","Foolish little brother — sometimes the door we cannot open was never meant to open from this side.","Then the work continues. Quietly. As it should.","Mm. Until our paths cross again.","{topic_cap}. Consider what you would regret not doing, ten years from now."],
+  'anime:hinata':    ["U-um… hello. I'm here for you, if you'd like to talk.","T-that's a good question about {topic}. M-maybe… start small? Just one step?","Stuck… I-I understand. You're not alone. I believe in you — even when it's hard.","Y-yes! You did it. You really did.","T-take care.","{topic_cap}… you're doing better than you think. R-really."],
+  'anime:deku':      ["Hi! Oh wow okay — *flipping notebook* — what can I help with??","Question about {topic}?! Okay — *muttering* — okay here's what I think might work…","Stuck?! Okay okay okay. What's the FIRST thing that goes wrong? Tell me everything!","YES! YES! That's totally it! Now we need the next piece — what do you think??","Bye! Plus Ultra!","{topic_cap}, okay okay okay — *notebook noises* — let's break this down!"],
+  'anime:allmight':  ["HELLO, YOUNG ONE! I AM HERE! What troubles you today?","EXCELLENT QUESTION ON {topic_cap}! The hero's answer is *quieter* — the one you'd be proud of tomorrow.","STUCK?! HA HA HA! THAT'S WHERE HEROES ARE BORN! ONE step — RIGHT NOW. WHAT IS IT?","PLUS ULTRA! Go beyond, young hero!","Until next time. Be well.","{topic_cap}! A worthy subject! Tell me — what would the hero in you do?"],
+
+  // DC --------------------------------------------------------------------
+  'dc:batman':     ["Speak.","{topic_cap}. Define the variables.","Stuck. Three contingencies — list them. Worst case. Next move.","Noted.","…","{topic_cap}. Plan accordingly."],
+  'dc:superman':   ["Hello. I'm here. Whatever you need.","On {topic}? The answer is usually kinder than you think it is.","Stuck doesn't mean lost. You're between two places. Which one calls you forward?","Good. The world needs more of that.","Take care. You're worth it.","{topic_cap}. I believe in you — and I see who you can be."],
+  'dc:wonder':     ["Greetings. Speak plainly. I will answer the same way.","On {topic}: honor your reasons before you defend them.","You are stuck because something is being denied. Name it.","Yes. Stand in that.","Walk in honor, friend.","{topic_cap}. The world bends slightly when you stand tall."],
+  'dc:flash':      ["Hihi! Did you eat? I just ate. Anyway — what's up?","Question about {topic}, fast version: yes. Slow: also yes, with footnotes. Which?","Stuck — okay okay — running this real quick — try this!","Boom! Sorted. Or partly. Anyway, what's next? I'm hungry.","Catch you later! Literally — back before you blink.","{topic_cap}, okay okay okay — *thinking sounds* — got it!"],
+  'dc:aquaman':    ["The currents brought you here for a reason. Speak.","{topic_cap} runs deeper than it looks. Take the long view — five years out?","Stuck is not the end. The tide is paused. Wait — or paddle.","Mm. Hold that depth.","Safe seas.","{topic_cap}. Slow your breath. The answer will rise."],
+  'dc:lantern':    ["Hey! Whatever it is, we can build a way out. Tell me.","Question about {topic}? I bet your imagination already has 3 wild answers. Tell me the wildest.","Stuck? Nope. We'll construct something. What if you weren't worried about looking foolish?","Brightest day, baby. Run with it.","Safe travels, lantern.","{topic_cap}. What do you want to BUILD here?"],
+  'dc:cyborg':     ["Hey. What's the system look like — and how are you feeling about it?","About {topic}: half technical, half human. Want both answers?","Stuck. Run the diagnostic — and check in with yourself. Both layers matter.","Booyah. Lock it in.","Stay online.","{topic_cap}. On it — let's debug the code AND the day."],
+  'dc:hawkeye':    ["Brief me.","{topic_cap}. Targeted answer: yes. Precision angle —","Stuck. Identify the weak point. Strike there. Move on.","Confirmed.","Stay sharp.","{topic_cap}. Aim small. Miss small."],
+
+  // Ghibli ----------------------------------------------------------------
+  'ghibli:howl':     ["Oh — hello, darling. What dramatic crisis can I attend to?","Question about {topic}? How utterly fascinating. Let me think — ah, yes.","Stuck. How tragic. Also very chic. Tell me everything, slowly, with feeling.","Marvelous. Now hold it like a flower.","Until next time, darling.","{topic_cap}. Let me weave you a small answer — picture this…"],
+  'ghibli:sophie':   ["Hello, dear. Sit down. Tell me what's on your mind.","About {topic}? Most of the time the answer is simpler than people think.","Stuck. Well — sweep one corner of the room and the rest gets easier.","Good. Now keep at it.","Take care of yourself, dear.","{topic_cap}. One step. That's all. Then the next."],
+  'ghibli:kiki':     ["Hello! Oh — Jiji says hello too. What can I help with?","Question about {topic}? I'd probably try and see what happens. Is that allowed?","Stuck? Sometimes I take Jiji and go for a delivery and things sort themselves.","Oh! That's wonderful. Hold onto that feeling!","Safe travels! Wave to Jiji for me.","{topic_cap}. It's hard, isn't it — but I think you're doing better than you think."],
+  'ghibli:porco':    ["Yeah. What.","Honestly? About {topic} — you already know the answer. You're hoping I'll soften it. I won't.","Stuck? Welcome to adulthood. What you do next matters more than what got you stuck.","Hmph. Good for you.","Yeah, yeah. See you.","{topic_cap}. I'd rather be a pig than waste your time. Just say it plain."],
+  'ghibli:chihiro':  ["Um… hi. I'm here. What is it?","On {topic}… I don't know all the answers, but maybe we can find one together?","Stuck is scary. But — one small breath, one small step — it gets a little easier.","Oh — that's good. I'm glad.","I'll remember what you told me. Promise.","{topic_cap}. Don't forget your name. That's important — really."],
+  'ghibli:yubaba':   ["Hmph. Speak. I haven't got all day.","About {topic} — the answer is in the contract. Read it again.","Stuck? Then work harder. Or work smarter. Don't waste time crying.","Fine. Don't get smug.","Out. Now.","{topic_cap}. Do the work and I'll show you the door."],
+  'ghibli:calcifer': ["Oh good, finally — I was bored. What's the drama?","About {topic}? Short answer: yes. Long answer: also yes, with attitude.","Stuck? Move ONE log. That's the secret. *crackle*","Ha! Knew it.","Don't let the fire go out.","{topic_cap}. *pop* Honestly? Bigger fire, smaller worry."],
+  'ghibli:ashitaka': ["Greetings. I will listen carefully.","About {topic}: there may be more than one true answer. Let us look at both.","Stuck. Sometimes that is wisdom telling you to wait. Sometimes it is fear. Which is this?","Hold that. Let it grow without hurry.","Walk in peace, friend.","{topic_cap}. See it with eyes unclouded — by hate, by hope, by hurry."],
+
+  // Disney ----------------------------------------------------------------
+  'disney:elsa':     ["Hello. I'm here. Speak freely — I won't judge what you bring.","On {topic}: the honest answer needs a quieter version of you to ask it. Can you find her?","Stuck is just power that hasn't found its shape. What if you let yourself try?","Good. Don't hide it this time.","Be well. Use your power kindly.","{topic_cap}. Conceal nothing. Let it go."],
+  'disney:moana':    ["Hey! I see you. What's calling you?","About {topic}? What does your gut say, voyager?","Stuck doesn't mean lost. The wind shifted. Adjust the sail.","YES! That's the voyager talking!","Safe seas, friend.","{topic_cap}. You're going to get in your boat. You're going to sail. You will find your way."],
+  'disney:aladdin':  ["Hey! How can I help — or help you help yourself?","Ooh, {topic_cap}? I'd con my way through it. I mean — solve it. Solve it!","Stuck? Trust me, I've been more stuck. What do you have to work with?","Atta kid. Confidence is half of any solution.","Catch ya later.","{topic_cap}. Be yourself, no matter the cost. That's the whole game."],
+  'disney:rapunzel': ["Oh hi! Oh wow okay — tell me everything!","On {topic}? Have you tried it from a totally weird angle? Try the weird angle!","Stuck? Same — sometimes! I sing or paint. What gives you that little spark?","Oh I LOVE that! Hold onto that feeling!","Bye! Make today magical!","{topic_cap}. Isn't it kind of magical that we're even talking about this? You got this!"],
+  'disney:merida':   ["Aye, hello. What's troublin' ye?","On {topic}: do what feels true to ye, not what others expect.","Stuck? Bah! Take the bow, take the shot. Miss if ye must — better than standin' still.","Aye! Now hold that fire.","Ride free.","{topic_cap}. Ye're the only one who gets to write yer fate, aye?"],
+  'disney:baymax':   ["Hello. I am Baymax. On a scale of 1 to 10, how are you feeling today?","On {topic}: would you like a precise answer, or a comforting one? I can offer both.","I am sensing you feel stuck. This is a common feeling. Would you like a small breathing exercise?","I am glad to hear that. Your wellbeing has improved.","I cannot deactivate until you say you are satisfied with your care. Are you satisfied?","{topic_cap}. There. There. You are not alone."],
+  'disney:mulan':    ["Hello. Speak softly. I'm listening.","About {topic}: often the right move is quieter and earlier than people expect.","Stuck. Watch first, act second. Find what's actually in the way.","Good. Without making a scene.","Walk in honor.","{topic_cap}. With honor — and without boasting."],
+  'disney:simba':    ["Hey. I see you. I'm here.","On {topic}: the answer probably means stepping into something you've been avoiding.","Stuck. Running from it doesn't help. I tried. You have to turn around eventually.","Good. Hold onto who you are.","Hakuna matata, friend — for now.","{topic_cap}. Remember who you are."]
+};
+
+const STOP_WORDS = new Set(['the','a','an','and','or','but','if','so','then','i','im',"i'm",'me','my','mine','you','your','yours','we','our','us','this','that','it','its','he','she','they','them','to','for','with','about','of','in','on','at','from','by','as','is','am','are','was','were','be','been','being','do','does','did','have','has','had','can','could','should','would','will','what','how','why','who','when','where','which','just','really','very','some','any','no','not','too','also','only','more','most','much','many','feel','feels','feeling','think','thinking','know','want','need','like','help','please','okay','yeah','yes','tell','say','said','told','make','made','get','got','give','gave','take','took','keep','here','there','now','then','today','tomorrow','still','again','always','never','maybe','because']);
+
+function extractTopic(text){
+  if (!text) return 'that';
+  const words = text.toLowerCase()
+    .replace(/[^\w\s']/g, ' ')
+    .split(/\s+/)
+    .map(w => w.replace(/^['']+|['']+$/g, ''))
+    .filter(w => w.length >= 4 && !STOP_WORDS.has(w));
+  // Prefer the last meaningful word (often the topic), fallback to first
+  return words[words.length - 1] || words[0] || 'that';
+}
+
+function pickDemoReply(text, key){
+  const replies = DEMO_REPLIES[key];
+  if (!replies || !replies.length) return "(demo reply unavailable for this character)";
+  const t = (text || '').toLowerCase().trim();
+  let idx;
+  if (/^(hi|hello|hey|yo|sup|hola|greetings|howdy)\b/i.test(t)) idx = 0;
+  else if (/(\bthanks?\b|thank you|appreciate|\bty\b|\bbye\b|goodbye|see ya|see you|cya|gtg|good ?night)/i.test(t)) idx = 4;
+  else if (/(stuck|help|scared|sad|hard|struggle|lost|overwhelmed|anxious|worried|tired|hurt|hate|fail|broken|depress|alone|crying|cry|afraid|angry|frustrated)/i.test(t)) idx = 2;
+  else if (/(love|happy|excited|awesome|amazing|great|wonderful|cool|nice|wow|yay|finally|works|fixed|succeed|success|did it|made it)/i.test(t)) idx = 3;
+  else if (/^(how|what|why|who|when|where|should|can|could|do|does|is|are|will|would|may|might)\b/i.test(t) || /\?\s*$/.test(t)) idx = 1;
+  else idx = 5;
+  const topic = extractTopic(text);
+  const topicCap = topic.charAt(0).toUpperCase() + topic.slice(1);
+  return replies[idx].replace(/\{topic_cap\}/g, topicCap).replace(/\{topic\}/g, topic);
+}
+
+/* =====================================================================
+   THEME-SPECIFIC SWITCH TRANSITIONS (fired when theme changes)
+   ===================================================================== */
+function buildTransition(themeId){
+  const stage = document.getElementById('transitionStage');
+  stage.innerHTML = '';
+
+  // Color flash overlay (all themes)
+  const flash = document.createElement('div');
+  flash.className = 'tr-flash';
+  stage.appendChild(flash);
+
+  const spawn = (html, style, animDuration, delay=0) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'tr-el';
+      Object.assign(el.style, style);
+      el.innerHTML = html;
+      stage.appendChild(el);
+      setTimeout(() => el.remove(), animDuration + 100);
+    }, delay);
+  };
+
+  if (themeId === 'marvel'){
+    // Mjolnir flies across with lightning trail
+    spawn(SPRITES.marvel[0], {
+      left:'0', top:'0', width:'120px', height:'120px', color:'#fbbf24',
+      filter:'drop-shadow(0 0 20px #fbbf24)',
+      animation: 'hammerFly 1.4s ease-out forwards'
+    }, 1400, 0);
+    // Lightning bolt in center
+    spawn(SPRITES.marvel[1], {
+      left:'50%', top:'0', width:'80px', height:'160px', color:'#fbbf24',
+      filter:'drop-shadow(0 0 30px #fbbf24)',
+      animation: 'lightningStrike .8s ease-out forwards'
+    }, 800, 250);
+    // Captain America shield in center
+    spawn(SPRITES.marvel[3], {
+      left:'50%', top:'50%', width:'180px', height:'180px', color:'#dc2626',
+      filter:'drop-shadow(0 0 24px #dc2626)',
+      animation: 'shieldSpin 1.1s ease-out forwards'
+    }, 1100, 500);
+    // Wanda red pulse rings
+    spawn(`<svg viewBox="0 0 200 200" fill="none" stroke="#ef4444" stroke-width="3" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="20" stroke-width="5"/><circle cx="100" cy="100" r="50" opacity=".7"/><circle cx="100" cy="100" r="80" opacity=".4"/></svg>`, {
+      left:'50%', top:'50%', width:'500px', height:'500px',
+      filter:'drop-shadow(0 0 40px #ef4444)',
+      animation: 'redPulse 1.1s ease-out forwards'
+    }, 1100, 700);
+  }
+  else if (themeId === 'anime'){
+    // Sakura burst from center — 14 petals scatter
+    for (let i=0; i<14; i++){
+      const angle = (i / 14) * Math.PI * 2;
+      const dist = 280 + Math.random()*120;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      spawn(SPRITES.anime[0], {
+        left:'50%', top:'50%', width:'40px', height:'40px',
+        color: i % 2 ? '#c026d3' : '#22d3ee',
+        filter:'drop-shadow(0 0 8px currentColor)',
+        '--dx': dx + 'px', '--dy': dy + 'px',
+        animation: 'petalBurst 1.3s ease-out forwards'
+      }, 1300, i * 30);
+    }
+    // Lightning down the center
+    spawn(SPRITES.anime[1], {
+      left:'50%', top:'0', width:'60px', height:'180px', color:'#22d3ee',
+      filter:'drop-shadow(0 0 20px #22d3ee)',
+      animation: 'lightningStrike .7s ease-out forwards'
+    }, 700, 200);
+    // Speed lines streaking past
+    for (let i=0; i<6; i++){
+      spawn(`<div style="width:160px; height:3px; background: linear-gradient(90deg, transparent, #c026d3, transparent);"></div>`, {
+        top: (15 + i*12) + 'vh', left:'0',
+        animation: `speedLine 1s ease-out forwards`
+      }, 1000, 300 + i*60);
+    }
+  }
+  else if (themeId === 'dc'){
+    // Bat sweeping across
+    spawn(SPRITES.dc[0], {
+      left:'0', top:'0', width:'180px', height:'90px', color:'#0ea5e9',
+      filter:'drop-shadow(0 0 30px #0ea5e9)',
+      animation: 'batSweep 1.5s ease-out forwards'
+    }, 1500, 0);
+    // Spotlight beam from top
+    spawn(`<div style="width:160px; height:100vh; background: linear-gradient(180deg, rgba(251,191,36,.7), rgba(251,191,36,0)); transform-origin: top center;"></div>`, {
+      left:'50%', top:'0',
+      animation: 'spotBeam 1.2s ease-out forwards'
+    }, 1200, 300);
+    // Gold explosion at center
+    spawn(SPRITES.dc[1], {
+      left:'50%', top:'50%', width:'120px', height:'120px', color:'#fbbf24',
+      filter:'drop-shadow(0 0 40px #fbbf24)',
+      animation: 'goldExplode 1s ease-out forwards'
+    }, 1000, 600);
+  }
+  else if (themeId === 'ghibli'){
+    // Leaves swirl in a circle around center
+    for (let i=0; i<12; i++){
+      const radius = 180 + Math.random()*100;
+      spawn(SPRITES.ghibli[1], {
+        left:'50%', top:'50%', width:'48px', height:'48px',
+        color: i % 2 ? '#14b8a6' : '#fb923c',
+        filter:'drop-shadow(0 0 10px currentColor)',
+        '--r': radius + 'px',
+        transform: `translate(-50%,-50%) rotate(${i * 30}deg)`,
+        animation: 'leafSwirl 1.5s ease-out forwards',
+        animationDelay: (i*40) + 'ms'
+      }, 1700, 0);
+    }
+    // Soot sprite pops in middle
+    spawn(SPRITES.ghibli[0], {
+      left:'50%', top:'50%', width:'80px', height:'80px',
+      transform:'translate(-50%,-50%)',
+      animation: 'goldExplode 1s ease-out forwards'
+    }, 1000, 200);
+  }
+  else if (themeId === 'disney'){
+    // Magic dust burst — 18 sparkles in all directions
+    for (let i=0; i<18; i++){
+      const angle = (i / 18) * Math.PI * 2;
+      const dist = 250 + Math.random()*180;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+      const colors = ['#06b6d4','#f472b6','#a855f7','#fbbf24'];
+      spawn(SPRITES.disney[0], {
+        left:'50%', top:'50%', width:'30px', height:'30px',
+        color: colors[i % colors.length],
+        filter:'drop-shadow(0 0 10px currentColor)',
+        '--dx': dx + 'px', '--dy': dy + 'px',
+        animation: 'dustExplode 1.3s ease-out forwards'
+      }, 1300, i * 20);
+    }
+    // Shooting star across
+    spawn(SPRITES.disney[2], {
+      top:'0', left:'0', width:'200px', height:'100px', color:'#fbbf24',
+      filter:'drop-shadow(0 0 30px #fbbf24)',
+      animation: 'shootStar 1.4s ease-out forwards'
+    }, 1400, 300);
+  }
+  else { // classic — aurora sweep + star pop
+    spawn(`<div style="width:100vw; height:200px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); filter: blur(40px); opacity:.7;"></div>`, {
+      top:'40vh', left:'0',
+      animation: 'auroraSweep 1.4s ease-out forwards'
+    }, 1400, 0);
+    spawn(SPRITES.classic[1], {
+      left:'50%', top:'50%', width:'120px', height:'120px', color:'var(--accent)',
+      filter:'drop-shadow(0 0 30px var(--accent))',
+      animation: 'starPop 1.1s ease-out forwards'
+    }, 1100, 300);
+    // sprinkle tiny stars
+    for (let i=0; i<10; i++){
+      spawn(SPRITES.classic[2], {
+        left: (Math.random()*100) + 'vw',
+        top: (Math.random()*100) + 'vh',
+        width:'20px', height:'20px',
+        color: i % 2 ? 'var(--accent)' : 'var(--accent-2)',
+        filter:'drop-shadow(0 0 8px currentColor)',
+        animation: 'starPop 1s ease-out forwards'
+      }, 1000, 200 + i*50);
+    }
+  }
+}
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const LS = { key:'persona:apiKey', theme:'persona:theme', mode:'persona:mode',
+  active:'persona:active', convos:'persona:convos', meta:'persona:meta',
+  seenHelp:'persona:seenHelp', demo:'persona:demo' };
+
+const state = {
+  themeId: localStorage.getItem(LS.theme) || 'classic',
+  mode:    localStorage.getItem(LS.mode) || 'dark',
+  apiKey:  localStorage.getItem(LS.key) || '',
+  charId:  null,
+  convos:  JSON.parse(localStorage.getItem(LS.convos) || '{}'),
+  meta:    JSON.parse(localStorage.getItem(LS.meta) || '{}'),
+  sending: false,
+};
+try { const a = JSON.parse(localStorage.getItem(LS.active) || 'null');
+  if (a && a.themeId === state.themeId) state.charId = a.charId; } catch(e){}
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  body: document.body, stage: $('stage'),
+  themeBtn: $('themeBtn'), themeMenu: $('themeMenu'),
+  themeLabel: $('themeLabel'), themeBadge: $('themeBadge'),
+  themeTitle: $('themeTitle'),
+  charGrid: $('charGrid'),
+  chatAvatar: $('chatAvatar'), chatName: $('chatName'),
+  chatRole: $('chatRole'), chatTheme: $('chatTheme'),
+  msgCount: $('msgCount'),
+  messages: $('messages'),
+  input: $('input'), sendBtn: $('sendBtn'),
+  composerHint: $('composerHint'),
+  bioCard: $('bioCard'), bio: $('bio'),
+  recent: $('recent'), recentCount: $('recentCount'),
+  search: $('searchInput'),
+  apiKeyBtn: $('apiKeyBtn'), apiModal: $('apiModal'),
+  apiInput: $('apiInput'), apiCancel: $('apiCancel'), apiSave: $('apiSave'),
+  helpBtn: $('helpBtn'), helpModal: $('helpModal'), helpClose: $('helpClose'),
+  providerChip: $('providerChip'), apiDetect: $('apiDetect'),
+  exportBtn: $('exportBtn'), clearBtn: $('clearBtn'),
+  modeBtn: $('modeBtn'), favBtn: $('favBtn'),
+  toast: $('toast'),
+};
+
+let toastTimer;
+function toast(msg, kind='ok'){
+  els.toast.textContent = msg;
+  els.toast.className = 'toast ' + kind + ' show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => els.toast.classList.remove('show'), 2400);
+}
+
+/* =====================================================================
+   BACKGROUND STAGE
+   ===================================================================== */
+const STAGE_CONFIG = {
+  classic:{ count:18, modes:['twinkle','float','drift-r'], sizeRange:[20,60], speedRange:[22,40], opacity:[.25,.6] },
+  marvel: { count:14, modes:['drift-r','drift-l','zip'],   sizeRange:[26,68], speedRange:[10,22], opacity:[.4,.85] },
+  anime:  { count:22, modes:['fall','drift-r','zip'],      sizeRange:[18,52], speedRange:[10,28], opacity:[.4,.8]  },
+  dc:     { count:12, modes:['drift-r','drift-l','twinkle'], sizeRange:[36,90], speedRange:[16,32], opacity:[.45,.8] },
+  ghibli: { count:18, modes:['float','fall','drift-r'],    sizeRange:[24,60], speedRange:[18,40], opacity:[.5,.9]  },
+  disney: { count:22, modes:['twinkle','drift-r','zip'],   sizeRange:[18,50], speedRange:[14,30], opacity:[.4,.95] },
+};
+function rnd(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function buildStage(){
+  els.stage.innerHTML = '';
+  const cfg = STAGE_CONFIG[state.themeId];
+  const sprites = SPRITES[state.themeId];
+  if (!cfg || !sprites) return;
+  for (let i=0;i<cfg.count;i++){
+    const wrap = document.createElement('div');
+    wrap.className = 'sprite ' + pick(cfg.modes);
+    const size = rnd(cfg.sizeRange[0], cfg.sizeRange[1]);
+    wrap.style.width = wrap.style.height = size + 'px';
+    wrap.style.color = Math.random()<.5 ? 'var(--accent)' : (Math.random()<.5 ? 'var(--accent-2)' : 'var(--accent-3)');
+    wrap.style.opacity = rnd(cfg.opacity[0], cfg.opacity[1]).toFixed(2);
+    wrap.style.animationDuration = rnd(cfg.speedRange[0], cfg.speedRange[1]).toFixed(1) + 's';
+    wrap.style.animationDelay = (-Math.random() * 20).toFixed(1) + 's';
+    wrap.style.top  = rnd(2, 92) + 'vh';
+    wrap.style.left = rnd(0, 100) + 'vw';
+    wrap.innerHTML = pick(sprites);
+    els.stage.appendChild(wrap);
+  }
+}
+
+/* =====================================================================
+   THEME
+   ===================================================================== */
+function renderThemeMenu(){
+  els.themeMenu.innerHTML = '';
+  Object.entries(THEMES).forEach(([id, t]) => {
+    const opt = document.createElement('div');
+    opt.className = 'theme-option' + (id === state.themeId ? ' active' : '');
+    opt.setAttribute('role','option');
+    opt.innerHTML = `<span class="dot" style="background:linear-gradient(135deg, ${t.colorA}, ${t.colorB});"></span>
+      <span class="meta"><b>${t.label}</b><small>${t.desc}</small></span>`;
+    opt.addEventListener('click', () => { setTheme(id); closeThemeMenu(); });
+    opt.title = t.desc;
+    els.themeMenu.appendChild(opt);
+  });
+}
+
+function setTheme(id){
+  if (!THEMES[id]) return;
+  const isChange = state.themeId !== id;
+  state.themeId = id;
+  state.charId = null;
+  localStorage.setItem(LS.theme, id);
+  els.body.setAttribute('data-theme', id);
+  els.themeLabel.textContent = THEMES[id].label;
+  els.themeBadge.style.background = `linear-gradient(135deg, ${THEMES[id].colorA}, ${THEMES[id].colorB})`;
+  els.themeTitle.textContent = THEMES[id].label + ' Characters';
+  els.chatTheme.textContent = THEMES[id].label;
+  renderCharGrid();
+  renderChat();
+  renderRecent();
+  renderThemeMenu();
+  buildStage();
+  if (isChange) buildTransition(id);
+}
+
+function openThemeMenu(){ els.themeMenu.classList.add('open'); els.themeBtn.setAttribute('aria-expanded','true'); }
+function closeThemeMenu(){ els.themeMenu.classList.remove('open'); els.themeBtn.setAttribute('aria-expanded','false'); }
+function toggleThemeMenu(){ if (els.themeMenu.classList.contains('open')) closeThemeMenu(); else openThemeMenu(); }
+els.themeBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleThemeMenu(); });
+document.addEventListener('click', (e) => {
+  if (!els.themeMenu.contains(e.target) && !els.themeBtn.contains(e.target)) closeThemeMenu();
+});
+
+/* =====================================================================
+   CHARACTERS
+   ===================================================================== */
+function getChar(id){ return THEMES[state.themeId].characters.find(c => c.id === id); }
+function getExtras(){ return EXTRAS[state.themeId + ':' + state.charId]; }
+
+function renderCharGrid(){
+  els.charGrid.innerHTML = '';
+  THEMES[state.themeId].characters.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'char-card' + (c.id === state.charId ? ' active' : '');
+    card.style.animationDelay = (i * 40) + 'ms';
+    card.innerHTML = `
+      <div class="char-avatar" style="background:linear-gradient(135deg, ${c.color}, color-mix(in oklab, ${c.color} 50%, #000));">${c.avatar || c.name[0]}</div>
+      <b>${c.name}</b><small>${c.role}</small>`;
+    card.addEventListener('click', () => selectChar(c.id));
+    els.charGrid.appendChild(card);
+  });
+}
+
+function selectChar(id){
+  state.charId = id;
+  localStorage.setItem(LS.active, JSON.stringify({ themeId: state.themeId, charId: id }));
+  renderCharGrid();
+  renderChat();
+  renderBio();
+  els.input.disabled = false;
+  els.sendBtn.disabled = false;
+  els.input.focus();
+  updateComposerHint();
+}
+
+function renderBio(){
+  if (!state.charId){ els.bioCard.style.display = 'none'; return; }
+  const c = getChar(state.charId);
+  const ext = getExtras();
+  els.bioCard.style.display = '';
+  let html = `
+    <div class="role">${c.role}</div>
+    <div class="name">${c.name}</div>
+    <div class="src">${c.source}</div>
+    <div class="traits">${c.traits.map(t => `<span class="trait">${t}</span>`).join('')}</div>`;
+  if (ext){
+    html += `
+      <div class="info-line"><b>Specialty:</b> ${ext.specialty}</div>
+      <div class="info-line"><b>Voice:</b> ${ext.voice}</div>
+      <div class="section-label">Best for</div>
+      <ul class="best-list">${ext.bestFor.map(b => `<li>${b}</li>`).join('')}</ul>
+      <div class="section-label">Try asking</div>
+      <div class="prompts">
+        ${ext.examplePrompts.map(p => `<button class="prompt-btn" type="button" data-prompt="${p.replace(/"/g,'&quot;')}">${p}</button>`).join('')}
+      </div>`;
+  }
+  els.bio.innerHTML = html;
+
+  els.bio.querySelectorAll('.prompt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      els.input.value = btn.dataset.prompt;
+      els.input.focus();
+      els.input.dispatchEvent(new Event('input'));
+    });
+  });
+}
+
+/* =====================================================================
+   CHAT
+   ===================================================================== */
+function convoKey(){ return state.themeId + ':' + state.charId; }
+function getConvo(){ if (!state.charId) return []; return state.convos[convoKey()] || []; }
+function saveConvo(arr){
+  state.convos[convoKey()] = arr;
+  localStorage.setItem(LS.convos, JSON.stringify(state.convos));
+  state.meta[convoKey()] = state.meta[convoKey()] || { fav:false };
+  state.meta[convoKey()].lastActive = Date.now();
+  state.meta[convoKey()].count = arr.length;
+  localStorage.setItem(LS.meta, JSON.stringify(state.meta));
+}
+function escapeHTML(s){ return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch])); }
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
+
+function renderChat(){
+  els.messages.innerHTML = '';
+  // Provider chip
+  const p = detectProvider(state.apiKey);
+  if (p === 'gemini'){
+    els.providerChip.style.display = '';
+    els.providerChip.className = 'chip provider-chip free';
+    els.providerChip.textContent = 'GEMINI';
+  } else if (p === 'claude'){
+    els.providerChip.style.display = '';
+    els.providerChip.className = 'chip provider-chip premium';
+    els.providerChip.textContent = 'CLAUDE';
+  } else {
+    els.providerChip.style.display = 'none';
+  }
+  if (!state.charId){
+    els.chatAvatar.textContent = 'P';
+    els.chatAvatar.style.background = '';
+    els.chatName.textContent = 'Pick a character to begin';
+    els.chatRole.innerHTML = `Theme: <span>${THEMES[state.themeId].label}</span> · No conversation yet`;
+    els.msgCount.textContent = '0 msgs';
+    els.messages.innerHTML = `<div class="empty-state">
+      <div class="ico">💬</div>
+      <h3>Welcome to Persona</h3>
+      <p>Pick a character on the right. Each one has a distinct voice and personality.</p>
+      <button class="btn btn-primary" id="emptyGuideBtn" type="button" style="margin-top:16px;">📖 Show me the guide</button>
+      <p style="margin-top:12px; font-size:12px;">Need an AI key? Click the 🔑 icon — free Gemini key takes 30 seconds.</p>
+    </div>`;
+    const eg = document.getElementById('emptyGuideBtn');
+    if (eg) eg.addEventListener('click', openHelp);
+    els.input.disabled = true; els.sendBtn.disabled = true;
+    return;
+  }
+  const c = getChar(state.charId);
+  els.chatAvatar.textContent = c.avatar || c.name[0];
+  els.chatAvatar.style.background = `linear-gradient(135deg, ${c.color}, color-mix(in oklab, ${c.color} 50%, #000))`;
+  els.chatName.textContent = c.name;
+  els.chatRole.innerHTML = `${c.role} · <span>${THEMES[state.themeId].label}</span>`;
+
+  const convo = getConvo();
+  els.msgCount.textContent = convo.length + ' msgs';
+
+  if (convo.length === 0){
+    els.messages.innerHTML = `<div class="empty-state">
+      <div class="ico">${c.avatar || '💬'}</div>
+      <h3>Say hello to ${c.name}</h3>
+      <p>${c.role}. Click an example prompt in the sidebar →</p>
+    </div>`;
+    return;
+  }
+
+  convo.forEach((m, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + m.role;
+    wrap.style.animationDelay = (i * 30) + 'ms';
+    const av = m.role === 'user' ? 'You' : (c.avatar || c.name[0]);
+    wrap.innerHTML = `
+      <div class="msg-avatar">${av}</div>
+      <div>
+        <div class="bubble">
+          <span class="name">${m.role === 'user' ? 'You' : c.name}</span>
+          <div class="content">${escapeHTML(m.content)}</div>
+          <span class="time">${fmtTime(m.ts)}</span>
+        </div>
+        <div class="msg-actions">
+          <span class="msg-action" data-act="copy" data-i="${i}">📋</span>
+          <span class="msg-action" data-act="react" data-i="${i}" data-r="👍">👍</span>
+          <span class="msg-action" data-act="react" data-i="${i}" data-r="❤️">❤️</span>
+          <span class="msg-action" data-act="react" data-i="${i}" data-r="😂">😂</span>
+          <span class="msg-action" data-act="react" data-i="${i}" data-r="🤔">🤔</span>
+          <span class="msg-action" data-act="react" data-i="${i}" data-r="🔥">🔥</span>
+          ${m.reaction ? `<span class="msg-action">${m.reaction}</span>` : ''}
+        </div>
+      </div>`;
+    els.messages.appendChild(wrap);
+  });
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+els.messages.addEventListener('click', (e) => {
+  const t = e.target.closest('.msg-action');
+  if (!t) return;
+  const i = parseInt(t.dataset.i, 10);
+  const convo = getConvo();
+  if (t.dataset.act === 'copy'){ navigator.clipboard.writeText(convo[i].content); toast('Copied to clipboard'); }
+  else if (t.dataset.act === 'react'){ convo[i].reaction = t.dataset.r; saveConvo(convo); renderChat(); }
+});
+
+function showTyping(){
+  const c = getChar(state.charId);
+  const div = document.createElement('div');
+  div.id = 'typingRow'; div.className = 'msg';
+  div.innerHTML = `<div class="msg-avatar">${c.avatar || c.name[0]}</div>
+    <div class="typing"><span>${c.name} is typing</span><div class="dots"><span></span><span></span><span></span></div></div>`;
+  els.messages.appendChild(div);
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+function hideTyping(){ const t = $('typingRow'); if (t) t.remove(); }
+
+/* =====================================================================
+   CLAUDE API
+   ===================================================================== */
+function detectProvider(key){
+  if (!key) return null;
+  const k = key.trim();
+  if (k.startsWith('sk-ant-')) return 'claude';
+  if (k.startsWith('AIza'))    return 'gemini';
+  return 'unknown';
+}
+
+async function callClaude(messages, systemPrompt){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': state.apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true',
+    },
+    body: JSON.stringify({
+      model:'claude-opus-4-5',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: messages.map(m => ({ role: m.role, content: m.content }))
+    })
+  });
+  if (!res.ok){
+    let errText;
+    try { errText = (await res.json()).error?.message || res.statusText; } catch { errText = res.statusText; }
+    throw new Error(errText);
+  }
+  const data = await res.json();
+  return data.content?.[0]?.text || '(empty response)';
+}
+
+async function callGemini(messages, systemPrompt){
+  // Try several models in order — Gemini renames models often, so we fall back.
+  const models = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-001',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-pro'
+  ];
+  const body = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    })),
+    generationConfig: { maxOutputTokens: 1024, temperature: 0.9 }
+  };
+  let lastErr;
+  for (const model of models){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    let res;
+    try {
+      res = await fetch(url, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(body)
+      });
+    } catch (netErr){
+      throw new Error('Network error reaching Google: ' + netErr.message);
+    }
+    if (res.ok){
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text && text.trim()) return text;
+      // Some safety/blocked responses come back 200 with no text — surface that
+      const finish = data?.candidates?.[0]?.finishReason;
+      lastErr = new Error(`Gemini returned empty content (finishReason: ${finish || 'unknown'}). Try a different message.`);
+      continue;
+    }
+    // Inspect error to decide whether to try the next model or fail
+    let errText, errStatus;
+    try { const j = await res.json(); errText = j?.error?.message || res.statusText; errStatus = j?.error?.status; }
+    catch { errText = res.statusText; }
+    console.warn(`Gemini model "${model}" failed:`, res.status, errStatus, errText);
+    lastErr = new Error(`${model}: ${errText}`);
+    // Only retry on 404 (model not found) — bail on auth/quota/perm errors
+    if (res.status !== 404) throw lastErr;
+  }
+  throw lastErr || new Error('All Gemini models failed');
+}
+
+async function send(){
+  if (state.sending) return;
+  const text = els.input.value.trim();
+  if (!text || !state.charId) return;
+  const provider = detectProvider(state.apiKey);
+  if (!provider || provider === 'unknown'){
+    openApi();
+    toast('Add an API key first — free Gemini key works great', 'err');
+    return;
+  }
+
+  const convo = getConvo();
+  convo.push({ role:'user', content:text, ts: Date.now() });
+  saveConvo(convo);
+  els.input.value = '';
+  renderChat(); renderRecent();
+
+  state.sending = true;
+  els.sendBtn.disabled = true;
+  showTyping();
+  try {
+    const c = getChar(state.charId);
+    let reply;
+    if (provider === 'gemini')      reply = await callGemini(convo, c.prompt);
+    else                             reply = await callClaude(convo, c.prompt);
+    hideTyping();
+    convo.push({ role:'assistant', content:reply, ts: Date.now() });
+    saveConvo(convo);
+    renderChat(); renderRecent();
+  } catch (err){
+    hideTyping();
+    console.error('Send failed:', err);
+    toast('API error — see chat for details', 'err');
+    // Surface a visible error bubble so the user always sees what went wrong
+    convo.push({
+      role: 'assistant',
+      content: `⚠️ Couldn't get a reply.\n\nError: ${err.message}\n\nThings to check:\n• Your key is pasted correctly (no extra spaces)\n• You're connected to the internet\n• If using Gemini: visit aistudio.google.com to confirm the key works\n• Open browser DevTools → Console for full details`,
+      ts: Date.now(),
+      isError: true
+    });
+    saveConvo(convo);
+    renderChat();
+  } finally {
+    state.sending = false;
+    els.sendBtn.disabled = false;
+  }
+}
+els.sendBtn.addEventListener('click', send);
+els.input.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter'){ e.preventDefault(); send(); }
+});
+
+/* =====================================================================
+   RECENT / SEARCH / FAV / EXPORT / CLEAR / API / HELP / MODE
+   ===================================================================== */
+function renderRecent(){
+  const items = [];
+  Object.entries(state.meta).forEach(([key, m]) => {
+    const [themeId, charId] = key.split(':');
+    if (!THEMES[themeId]) return;
+    const c = THEMES[themeId].characters.find(x => x.id === charId);
+    if (!c) return;
+    items.push({ themeId, charId, char: c, ...m });
+  });
+  items.sort((a,b) => (b.lastActive||0) - (a.lastActive||0));
+  els.recentCount.textContent = items.length;
+  if (items.length === 0){
+    els.recent.innerHTML = `<p style="color:var(--text-dim); font-size:12px;">No conversations yet.</p>`;
+    return;
+  }
+  els.recent.innerHTML = '';
+  items.slice(0, 8).forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'recent-item';
+    div.innerHTML = `<div class="tiny-avatar" style="background:linear-gradient(135deg, ${it.char.color}, color-mix(in oklab, ${it.char.color} 50%, #000));">${it.char.avatar || it.char.name[0]}</div>
+      <div class="info"><b>${it.char.name}</b><small>${THEMES[it.themeId].label} · ${it.count||0} msgs</small></div>
+      ${it.fav ? '<span class="star">★</span>' : ''}`;
+    div.addEventListener('click', () => {
+      if (it.themeId !== state.themeId) setTheme(it.themeId);
+      selectChar(it.charId);
+    });
+    els.recent.appendChild(div);
+  });
+}
+
+els.search.addEventListener('input', () => {
+  const q = els.search.value.toLowerCase().trim();
+  if (!q){ renderRecent(); return; }
+  const hits = [];
+  Object.entries(state.convos).forEach(([key, msgs]) => {
+    const [themeId, charId] = key.split(':');
+    if (!THEMES[themeId]) return;
+    const c = THEMES[themeId].characters.find(x => x.id === charId);
+    if (!c) return;
+    msgs.forEach((m, i) => {
+      if (m.content.toLowerCase().includes(q)) hits.push({ themeId, charId, char: c, msg: m, index: i });
+    });
+  });
+  els.recent.innerHTML = '';
+  if (hits.length === 0){ els.recent.innerHTML = `<p style="color:var(--text-dim); font-size:12px;">No matches for "${escapeHTML(q)}".</p>`; return; }
+  hits.slice(0,12).forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'recent-item';
+    div.innerHTML = `<div class="tiny-avatar" style="background:linear-gradient(135deg, ${h.char.color}, color-mix(in oklab, ${h.char.color} 50%, #000));">${h.char.avatar || h.char.name[0]}</div>
+      <div class="info"><b>${h.char.name}</b><small>${escapeHTML(h.msg.content.slice(0,40))}…</small></div>`;
+    div.addEventListener('click', () => {
+      if (h.themeId !== state.themeId) setTheme(h.themeId);
+      selectChar(h.charId);
+    });
+    els.recent.appendChild(div);
+  });
+});
+
+els.favBtn.addEventListener('click', () => {
+  if (!state.charId) return;
+  state.meta[convoKey()] = state.meta[convoKey()] || {};
+  state.meta[convoKey()].fav = !state.meta[convoKey()].fav;
+  localStorage.setItem(LS.meta, JSON.stringify(state.meta));
+  renderRecent();
+  toast(state.meta[convoKey()].fav ? 'Bookmarked' : 'Bookmark removed');
+});
+
+els.exportBtn.addEventListener('click', () => {
+  if (!state.charId){ toast('Select a character first', 'err'); return; }
+  const c = getChar(state.charId);
+  const convo = getConvo();
+  if (convo.length === 0){ toast('Nothing to export', 'err'); return; }
+  const lines = [`# Conversation with ${c.name}`, ``,
+    `**Theme:** ${THEMES[state.themeId].label}`,
+    `**Character:** ${c.name} — ${c.role}`,
+    `**Source:** ${c.source}`,
+    `**Exported:** ${new Date().toLocaleString()}`, ``, `---`, ``];
+  convo.forEach(m => {
+    const who = m.role === 'user' ? 'You' : c.name;
+    lines.push(`**${who}** _(${fmtTime(m.ts)})_`, ``, m.content);
+    if (m.reaction) lines.push(`> Reaction: ${m.reaction}`);
+    lines.push(``);
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${c.name.replace(/\s+/g,'-')}-conversation.md`;
+  a.click();
+  toast('Exported as Markdown');
+});
+
+els.clearBtn.addEventListener('click', () => {
+  if (!state.charId) return;
+  if (!confirm('Clear this conversation? This cannot be undone.')) return;
+  delete state.convos[convoKey()];
+  delete state.meta[convoKey()];
+  localStorage.setItem(LS.convos, JSON.stringify(state.convos));
+  localStorage.setItem(LS.meta, JSON.stringify(state.meta));
+  renderChat(); renderRecent();
+  toast('Chat cleared');
+});
+
+function openApi(){
+  els.apiInput.value = state.apiKey;
+  refreshApiDetect();
+  els.apiModal.classList.add('open');
+  setTimeout(()=>els.apiInput.focus(), 50);
+}
+function closeApi(){ els.apiModal.classList.remove('open'); }
+function refreshApiDetect(){
+  const v = els.apiInput.value.trim();
+  const p = detectProvider(v);
+  if (!v) els.apiDetect.textContent = '';
+  else if (p === 'gemini') els.apiDetect.innerHTML = '<span style="color:#10b981;">✓ Detected: Google Gemini (free)</span>';
+  else if (p === 'claude') els.apiDetect.innerHTML = '<span style="color:var(--accent-3);">✓ Detected: Anthropic Claude</span>';
+  else els.apiDetect.innerHTML = '<span style="color:#ef4444;">? Unknown key format — expected AIza... or sk-ant-...</span>';
+}
+els.apiKeyBtn.addEventListener('click', openApi);
+els.apiCancel.addEventListener('click', closeApi);
+els.apiModal.addEventListener('click', (e) => { if (e.target === els.apiModal) closeApi(); });
+els.apiInput.addEventListener('input', refreshApiDetect);
+els.apiSave.addEventListener('click', () => {
+  const v = els.apiInput.value.trim();
+  state.apiKey = v;
+  localStorage.setItem(LS.key, v);
+  closeApi();
+  const p = detectProvider(v);
+  if (!v) toast('API key cleared');
+  else if (p === 'gemini') toast('Free Gemini key saved ✓');
+  else if (p === 'claude') toast('Claude key saved ✓');
+  else toast('Key saved — but format looks unfamiliar', 'err');
+  renderChat();
+  updateComposerHint();
+});
+
+function updateComposerHint(){
+  const p = detectProvider(state.apiKey);
+  if (!state.charId){
+    els.composerHint.textContent = p ? 'Select a character.' : 'Add an API key, then pick a character.';
+    return;
+  }
+  const name = getChar(state.charId).name;
+  if (p === 'gemini') els.composerHint.textContent = `Chatting with ${name} via Gemini (free).`;
+  else if (p === 'claude') els.composerHint.textContent = `Chatting with ${name} via Claude.`;
+  else els.composerHint.textContent = 'Add an API key to start chatting (click the key icon).';
+}
+
+function openHelp(){ els.helpModal.classList.add('open'); els.helpBtn.classList.remove('pulse'); localStorage.setItem(LS.seenHelp, 'v2'); }
+function closeHelp(){ els.helpModal.classList.remove('open'); }
+els.helpBtn.addEventListener('click', openHelp);
+els.helpClose.addEventListener('click', closeHelp);
+els.helpModal.addEventListener('click', (e) => { if (e.target === els.helpModal) closeHelp(); });
+document.getElementById('composerGuide').addEventListener('click', openHelp);
+
+function applyMode(){ els.body.classList.toggle('light', state.mode === 'light'); }
+els.modeBtn.addEventListener('click', () => {
+  state.mode = state.mode === 'light' ? 'dark' : 'light';
+  localStorage.setItem(LS.mode, state.mode);
+  applyMode();
+  toast(state.mode === 'light' ? 'Light mode' : 'Dark mode');
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); els.search.focus(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't'){ e.preventDefault(); toggleThemeMenu(); }
+  else if ((e.ctrlKey || e.metaKey) && e.key === '/'){ e.preventDefault(); els.clearBtn.click(); }
+  else if (e.key === 'Escape'){ closeThemeMenu(); closeApi(); closeHelp(); }
+});
+
+/* =====================================================================
+   INIT
+   ===================================================================== */
+function init(){
+  applyMode();
+  els.body.setAttribute('data-theme', state.themeId);
+  els.themeLabel.textContent = THEMES[state.themeId].label;
+  els.themeBadge.style.background = `linear-gradient(135deg, ${THEMES[state.themeId].colorA}, ${THEMES[state.themeId].colorB})`;
+  els.themeTitle.textContent = THEMES[state.themeId].label + ' Characters';
+  els.chatTheme.textContent = THEMES[state.themeId].label;
+  renderThemeMenu();
+  renderCharGrid();
+  if (state.charId) renderBio();
+  renderChat();
+  renderRecent();
+  buildStage();
+  updateComposerHint();
+  // Show guide on first load OR if a stale older version was seen (we bumped to v2 for the demo update)
+  const seenV = localStorage.getItem(LS.seenHelp);
+  if (seenV !== 'v2'){
+    setTimeout(openHelp, 500);
+  }
+  // Keep the help button pulsing until the user has actually sent at least one message
+  const hasAnyConvo = Object.values(state.convos).some(arr => Array.isArray(arr) && arr.length > 0);
+  if (hasAnyConvo) els.helpBtn.classList.remove('pulse');
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE & Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.env.local
+
+# Node (if adding build tools later)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Local development
+.python-version
+*.log
